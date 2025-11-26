@@ -1,5 +1,10 @@
+import { POSProvider } from '@/context/pos-context'
 import Dashboard from '@/pages/dashboard'
 
 export default function DashboardExample() {
-  return <Dashboard />
+  return (
+    <POSProvider>
+      <Dashboard />
+    </POSProvider>
+  )
 }

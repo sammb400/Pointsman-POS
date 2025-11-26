@@ -1,48 +1,55 @@
 import DashboardLayout from "@/components/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, ShoppingBag, Users, TrendingUp, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { DollarSign, ShoppingBag, Package, TrendingUp, ArrowUpRight } from "lucide-react";
+import { usePOS } from "@/context/pos-context";
 
 export default function Dashboard() {
-  // todo: remove mock functionality - replace with real data from API
+  const { products, sales } = usePOS();
+
+  const totalRevenue = sales.reduce((sum, sale) => sum + sale.total, 0);
+  const totalOrders = sales.length;
+  const totalProducts = products.length;
+  const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
   const stats = [
     {
       title: "Total Revenue",
-      value: "$12,426",
-      change: "+12.5%",
-      trend: "up",
+      value: `$${totalRevenue.toFixed(2)}`,
+      change: `${totalOrders} sales`,
       icon: DollarSign,
     },
     {
       title: "Total Orders",
-      value: "284",
-      change: "+8.2%",
-      trend: "up",
+      value: totalOrders.toString(),
+      change: "Completed",
       icon: ShoppingBag,
     },
     {
-      title: "Active Employees",
-      value: "12",
-      change: "+2",
-      trend: "up",
-      icon: Users,
+      title: "Products",
+      value: totalProducts.toString(),
+      change: "In inventory",
+      icon: Package,
     },
     {
       title: "Avg. Order Value",
-      value: "$43.75",
-      change: "-2.4%",
-      trend: "down",
+      value: `$${avgOrderValue.toFixed(2)}`,
+      change: "Per transaction",
       icon: TrendingUp,
     },
   ];
 
-  // todo: remove mock functionality - replace with real data from API
-  const recentOrders = [
-    { id: "#001234", customer: "Walk-in", items: 3, total: "$45.99", status: "Completed" },
-    { id: "#001233", customer: "Walk-in", items: 1, total: "$12.50", status: "Completed" },
-    { id: "#001232", customer: "John D.", items: 5, total: "$89.00", status: "Completed" },
-    { id: "#001231", customer: "Walk-in", items: 2, total: "$28.75", status: "Completed" },
-    { id: "#001230", customer: "Sarah M.", items: 4, total: "$67.25", status: "Completed" },
-  ];
+  // Get recent orders from sales
+  const recentOrders = sales.slice(0, 5).map(sale => ({
+    id: sale.id.replace("SALE-", "#"),
+    customer: "Walk-in",
+    items: sale.items.reduce((sum, item) => sum + item.quantity, 0),
+    total: `$${sale.total.toFixed(2)}`,
+    status: "Completed",
+    paymentType: sale.paymentType,
+  }));
+
+  // Low stock products
+  const lowStockProducts = products.filter(p => p.stock <= 10).slice(0, 5);
 
   return (
     <DashboardLayout>
@@ -64,57 +71,97 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{stat.value}</div>
-                <div className={`flex items-center text-xs mt-1 ${
-                  stat.trend === "up" ? "text-green-600" : "text-red-600"
-                }`}>
-                  {stat.trend === "up" ? (
-                    <ArrowUpRight className="h-3 w-3 mr-1" />
-                  ) : (
-                    <ArrowDownRight className="h-3 w-3 mr-1" />
-                  )}
-                  {stat.change} from last month
+                <div className="flex items-center text-xs mt-1 text-muted-foreground">
+                  <ArrowUpRight className="h-3 w-3 mr-1" />
+                  {stat.change}
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
 
-        {/* Recent Orders */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Orders</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Order ID</th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Customer</th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Items</th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Total</th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentOrders.map((order) => (
-                    <tr key={order.id} className="border-b last:border-0 hover-elevate">
-                      <td className="py-3 px-4 font-medium" data-testid={`order-id-${order.id}`}>{order.id}</td>
-                      <td className="py-3 px-4 text-muted-foreground">{order.customer}</td>
-                      <td className="py-3 px-4 text-muted-foreground">{order.items}</td>
-                      <td className="py-3 px-4 font-medium">{order.total}</td>
-                      <td className="py-3 px-4">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                          {order.status}
+        <div className="grid lg:grid-cols-2 gap-6">
+          {/* Recent Orders */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Orders</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {recentOrders.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <ShoppingBag className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No orders yet. Complete your first sale!</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-3 px-2 font-medium text-muted-foreground text-sm">Order ID</th>
+                        <th className="text-left py-3 px-2 font-medium text-muted-foreground text-sm">Items</th>
+                        <th className="text-left py-3 px-2 font-medium text-muted-foreground text-sm">Total</th>
+                        <th className="text-left py-3 px-2 font-medium text-muted-foreground text-sm">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentOrders.map((order) => (
+                        <tr key={order.id} className="border-b last:border-0 hover-elevate">
+                          <td className="py-3 px-2 font-medium text-sm" data-testid={`order-id-${order.id}`}>{order.id}</td>
+                          <td className="py-3 px-2 text-muted-foreground text-sm">{order.items}</td>
+                          <td className="py-3 px-2 font-medium text-sm">{order.total}</td>
+                          <td className="py-3 px-2">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                              {order.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Low Stock Alert */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Low Stock Alert</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {lowStockProducts.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>All products are well stocked!</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {lowStockProducts.map((product) => (
+                    <div 
+                      key={product.id} 
+                      className="flex items-center justify-between p-3 bg-muted/50 rounded-md"
+                      data-testid={`low-stock-${product.id}`}
+                    >
+                      <div>
+                        <p className="font-medium">{product.name}</p>
+                        <p className="text-xs text-muted-foreground">{product.category}</p>
+                      </div>
+                      <div className="text-right">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          product.stock === 0 
+                            ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" 
+                            : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                        }`}>
+                          {product.stock === 0 ? "Out of Stock" : `${product.stock} left`}
                         </span>
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </DashboardLayout>
   );

@@ -1,0 +1,54 @@
+That's a very solid set of features! You are moving into the core operational logic of a POS system.
+
+Here is the prompt incorporating the new requirements (image upload, payments, sales history, and stock keeping), followed by a section on what you might be missing to make it fully functional.
+
+📈 React POS System: Core Operations and Data Prompt
+Expand the existing POS system with core data management, transaction, and inventory features.
+
+🎯 Feature Requirements:
+Product Creation Enhancement:
+
+Update the Add Products page (/dashboard/products/add) to include an Image Upload field (placeholder functionality is acceptable, focusing on the UI layout). The form should now capture Name, Price, Stock Quantity, and Image URL/File Input.
+
+Stock Keeping Logic:
+
+Implement Stock Logic in the application state. When a product is added, its quantity is stored.
+
+When an item is sold on the Shop/Register View, the application state must reflect a reduction in the product's stock quantity.
+
+Payment Processing & Checkout:
+
+In the Shop/Register View (/dashboard/shop), integrate a Checkout/Payment Panel into the Cart/Receipt section.
+
+This panel should include fields or buttons for selecting Payment Type (e.g., Cash, Card) and a field to calculate Change Due based on the amount tendered.
+
+Implement a "Finalize Sale" button that, when clicked, triggers the stock reduction and records the sale (see #4).
+
+Sales History & Reporting:
+
+Create a new page called Sales History (/dashboard/sales).
+
+This page should display a list or table of all finalized transactions (placeholder data is fine initially). Each record should minimally include the Date, Total Amount, and Payment Type.
+
+✨ Styling & Consistency:
+Maintain the existing React/JavaScript/Tailwind CSS stack and the accent color #FF6347.
+
+Ensure the new forms and tables are styled consistently using Tailwind CSS.
+
+💡 What You Are Missing (Recommendations)
+To turn this scaffold into a truly functional application, here are the key pieces of architecture and functionality you are currently missing:
+
+1. Data Persistence (Crucial)
+The Problem: Currently, all products, employees, and sales records exist only in the browser's temporary memory (React State). If the user refreshes the page, all data will be lost.
+
+Recommendation: While this prompt is focused on the frontend, you will eventually need Data Storage. For a quick and simple local persistence without a backend, you could use localStorage or sessionStorage. For a real application, you would need a full Backend API and a Database (e.g., Firebase, Supabase, or a custom Node.js/Express server).
+
+2. State Management for the POS (Efficiency)
+The Problem: Managing stock, the current cart, employee lists, and sales history across multiple pages using only standard React useState in the root component will quickly become complex and difficult to pass down through props (prop drilling).
+
+Recommendation: Implement a simple global state management solution like React Context API (built-in) or a lightweight library like Zustand or Redux Toolkit (if complexity demands it). This is essential for managing the current transaction cart and the global product stock easily.
+
+3. Data Validation and Error Handling (User Experience)
+The Problem: Your "Add Products" and "Sign Up" forms don't have built-in checks (e.g., ensuring Price is a number, checking for blank fields).
+
+Recommendation: Include basic form validation on all forms. Show helpful error messages to the user when they submit incorrect data.
