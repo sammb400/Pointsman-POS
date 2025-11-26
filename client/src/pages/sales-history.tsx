@@ -3,14 +3,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Receipt, CreditCard, Banknote, Search, Calendar, DollarSign, ShoppingBag } from "lucide-react";
-import { usePOS } from "@/context/pos-context";
+import { Receipt, CreditCard, Banknote, Search, Calendar, DollarSign, ShoppingBag, ChevronDown, ChevronRight } from "lucide-react";
+import { usePOS, type Sale } from "@/context/pos-context";
 import { useState } from "react";
+
+interface GroupedSales {
+  date: string;
+  displayDate: string;
+  sales: Sale[];
+  dailyTotal: number;
+}
 
 export default function SalesHistory() {
   const { sales } = usePOS();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"All" | "Cash" | "Card">("All");
+  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
 
   const filteredSales = sales.filter(sale => {
     const matchesSearch = sale.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -19,17 +27,60 @@ export default function SalesHistory() {
     return matchesSearch && matchesType;
   });
 
+  // Group sales by date
+  const groupedSales: GroupedSales[] = filteredSales.reduce((groups: GroupedSales[], sale) => {
+    const saleDate = new Date(sale.date);
+    const dateKey = saleDate.toISOString().split('T')[0];
+    const displayDate = saleDate.toLocaleDateString("en-US", {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    const existingGroup = groups.find(g => g.date === dateKey);
+    if (existingGroup) {
+      existingGroup.sales.push(sale);
+      existingGroup.dailyTotal += sale.total;
+    } else {
+      groups.push({
+        date: dateKey,
+        displayDate,
+        sales: [sale],
+        dailyTotal: sale.total
+      });
+    }
+    return groups;
+  }, []).sort((a, b) => b.date.localeCompare(a.date));
+
+  const toggleDay = (date: string) => {
+    setExpandedDays(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(date)) {
+        newSet.delete(date);
+      } else {
+        newSet.add(date);
+      }
+      return newSet;
+    });
+  };
+
+  const expandAll = () => {
+    setExpandedDays(new Set(groupedSales.map(g => g.date)));
+  };
+
+  const collapseAll = () => {
+    setExpandedDays(new Set());
+  };
+
   const totalRevenue = sales.reduce((sum, sale) => sum + sale.total, 0);
   const totalTransactions = sales.length;
   const cashTransactions = sales.filter(s => s.paymentType === "Cash").length;
   const cardTransactions = sales.filter(s => s.paymentType === "Card").length;
 
-  const formatDate = (dateString: string) => {
+  const formatTime = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
+    return date.toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
     });
@@ -40,7 +91,7 @@ export default function SalesHistory() {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Sales History</h1>
-          <p className="text-muted-foreground mt-1">View all completed transactions and sales reports.</p>
+          <p className="text-muted-foreground mt-1">View all completed transactions organized by date.</p>
         </div>
 
         {/* Stats Cards */}
@@ -114,7 +165,7 @@ export default function SalesHistory() {
               data-testid="input-search-sales"
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {(["All", "Cash", "Card"] as const).map(type => (
               <Button
                 key={type}
@@ -128,20 +179,21 @@ export default function SalesHistory() {
                 {type}
               </Button>
             ))}
+            <div className="border-l mx-2" />
+            <Button variant="outline" size="sm" onClick={expandAll}>
+              Expand All
+            </Button>
+            <Button variant="outline" size="sm" onClick={collapseAll}>
+              Collapse All
+            </Button>
           </div>
         </div>
 
-        {/* Sales Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Receipt className="h-5 w-5" />
-              Transaction History
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {filteredSales.length === 0 ? (
-              <div className="text-center py-12">
+        {/* Sales by Date */}
+        {groupedSales.length === 0 ? (
+          <Card>
+            <CardContent className="py-12">
+              <div className="text-center">
                 <Receipt className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <p className="text-lg font-medium">No transactions found</p>
                 <p className="text-muted-foreground">
@@ -150,73 +202,104 @@ export default function SalesHistory() {
                     : "Try adjusting your search or filter."}
                 </p>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Transaction ID</th>
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Date & Time</th>
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Items</th>
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground">Payment</th>
-                      <th className="text-right py-3 px-4 font-medium text-muted-foreground">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredSales.map((sale) => (
-                      <tr key={sale.id} className="border-b last:border-0 hover-elevate" data-testid={`sale-row-${sale.id}`}>
-                        <td className="py-4 px-4">
-                          <span className="font-mono text-sm">{sale.id}</span>
-                        </td>
-                        <td className="py-4 px-4">
-                          <div className="flex items-center gap-2 text-sm">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            {formatDate(sale.date)}
-                          </div>
-                        </td>
-                        <td className="py-4 px-4 hidden md:table-cell">
-                          <div className="flex flex-wrap gap-1">
-                            {sale.items.slice(0, 3).map((item, i) => (
-                              <Badge key={i} variant="outline" className="text-xs">
-                                {item.name} x{item.quantity}
-                              </Badge>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {groupedSales.map(group => {
+              const isExpanded = expandedDays.has(group.date);
+              return (
+                <Card key={group.date}>
+                  <CardHeader 
+                    className="cursor-pointer hover-elevate rounded-t-lg"
+                    onClick={() => toggleDay(group.date)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {isExpanded ? (
+                          <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                        )}
+                        <Calendar className="h-5 w-5 text-primary" />
+                        <div>
+                          <CardTitle className="text-lg">{group.displayDate}</CardTitle>
+                          <p className="text-sm text-muted-foreground">
+                            {group.sales.length} transaction{group.sales.length !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-primary">${group.dailyTotal.toFixed(2)}</p>
+                        <p className="text-sm text-muted-foreground">Daily Total</p>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  
+                  {isExpanded && (
+                    <CardContent className="pt-0">
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b">
+                              <th className="text-left py-3 px-4 font-medium text-muted-foreground">Time</th>
+                              <th className="text-left py-3 px-4 font-medium text-muted-foreground">Transaction ID</th>
+                              <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Items</th>
+                              <th className="text-left py-3 px-4 font-medium text-muted-foreground">Payment</th>
+                              <th className="text-right py-3 px-4 font-medium text-muted-foreground">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {group.sales.map((sale) => (
+                              <tr key={sale.id} className="border-b last:border-0 hover-elevate" data-testid={`sale-row-${sale.id}`}>
+                                <td className="py-4 px-4 text-sm">
+                                  {formatTime(sale.date)}
+                                </td>
+                                <td className="py-4 px-4">
+                                  <span className="font-mono text-sm">{sale.id}</span>
+                                </td>
+                                <td className="py-4 px-4 hidden md:table-cell">
+                                  <div className="flex flex-wrap gap-1">
+                                    {sale.items.slice(0, 3).map((item, i) => (
+                                      <Badge key={i} variant="outline" className="text-xs">
+                                        {item.name} x{item.quantity}
+                                      </Badge>
+                                    ))}
+                                    {sale.items.length > 3 && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        +{sale.items.length - 3} more
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="py-4 px-4">
+                                  <Badge 
+                                    variant={sale.paymentType === "Cash" ? "outline" : "default"}
+                                    className="gap-1"
+                                  >
+                                    {sale.paymentType === "Cash" ? (
+                                      <Banknote className="h-3 w-3" />
+                                    ) : (
+                                      <CreditCard className="h-3 w-3" />
+                                    )}
+                                    {sale.paymentType}
+                                  </Badge>
+                                </td>
+                                <td className="py-4 px-4 text-right">
+                                  <span className="font-bold">${sale.total.toFixed(2)}</span>
+                                </td>
+                              </tr>
                             ))}
-                            {sale.items.length > 3 && (
-                              <Badge variant="secondary" className="text-xs">
-                                +{sale.items.length - 3} more
-                              </Badge>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-4 px-4">
-                          <Badge 
-                            variant={sale.paymentType === "Cash" ? "outline" : "default"}
-                            className="gap-1"
-                          >
-                            {sale.paymentType === "Cash" ? (
-                              <Banknote className="h-3 w-3" />
-                            ) : (
-                              <CreditCard className="h-3 w-3" />
-                            )}
-                            {sale.paymentType}
-                          </Badge>
-                        </td>
-                        <td className="py-4 px-4 text-right">
-                          <span className="font-bold text-primary">${sale.total.toFixed(2)}</span>
-                          {sale.paymentType === "Cash" && sale.changeDue !== undefined && sale.changeDue > 0 && (
-                            <p className="text-xs text-muted-foreground">
-                              Change: ${sale.changeDue.toFixed(2)}
-                            </p>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

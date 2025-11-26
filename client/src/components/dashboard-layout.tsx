@@ -9,7 +9,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Menu,
-  BarChart3
+  BarChart3,
+  Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -24,6 +25,7 @@ const navItems = [
   { path: "/dashboard/sales", label: "Sales History", icon: BarChart3 },
   { path: "/dashboard/employees", label: "Employees", icon: Users },
   { path: "/dashboard/products/add", label: "Add Products", icon: PlusCircle },
+  { path: "/dashboard/admin", label: "Admin Portal", icon: Shield, isAdmin: true },
 ];
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
@@ -73,7 +75,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
         {/* Navigation */}
         <nav className="flex-1 py-4 px-2 space-y-1">
-          {navItems.map((item) => {
+          {navItems.filter(item => !item.isAdmin).map((item) => {
             const isActive = location === item.path || 
               (item.path !== "/dashboard" && location.startsWith(item.path));
             return (
@@ -93,6 +95,32 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               </Link>
             );
           })}
+          
+          {/* Admin Section Divider */}
+          <div className="pt-4 mt-4 border-t">
+            {!collapsed && (
+              <p className="px-3 text-xs font-medium text-muted-foreground mb-2">ADMINISTRATION</p>
+            )}
+            {navItems.filter(item => item.isAdmin).map((item) => {
+              const isActive = location.startsWith(item.path);
+              return (
+                <Link key={item.path} href={item.path}>
+                  <div
+                    className={`
+                      flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors
+                      hover-elevate cursor-pointer
+                      ${isActive ? "bg-primary text-primary-foreground" : "text-primary"}
+                    `}
+                    onClick={() => setMobileOpen(false)}
+                    data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    <item.icon className="h-5 w-5 flex-shrink-0" />
+                    {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
         </nav>
 
         {/* Footer */}
