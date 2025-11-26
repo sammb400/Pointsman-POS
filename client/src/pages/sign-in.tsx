@@ -105,10 +105,8 @@ export default function SignIn() {
 
             <div className="text-center text-sm">
               <span className="text-muted-foreground">Don't have an account? </span>
-              <Link href="/sign-up">
-                <a className="text-primary font-semibold hover-elevate px-2 py-1 rounded-md inline-block" data-testid="link-signup">
-                  Sign up
-                </a>
+              <Link href="/sign-up" className="text-primary font-semibold hover-elevate px-2 py-1 rounded-md inline-block" data-testid="link-signup">
+                Sign up
               </Link>
             </div>
           </CardContent>
