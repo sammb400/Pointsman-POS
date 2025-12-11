@@ -55,7 +55,7 @@ export default function SignUp() {
           <Link href="/">
             <div className="inline-flex items-center gap-2 mb-4 hover-elevate px-3 py-2 rounded-md">
               <ShoppingCart className="h-8 w-8 text-primary" />
-              <span className="font-bold text-2xl">ModernPOS</span>
+              <span className="font-bold text-2xl">Pointsman POS</span>
             </div>
           </Link>
         </div>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,14 +13,17 @@ export default function SignIn() {
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log("Sign in attempted", { email, rememberMe });
+    // Here you would typically perform your authentication logic
     toast({
-      title: "Sign In Attempted",
-      description: `Email: ${email}`,
+      title: "Sign In Successful",
+      description: "Welcome back! Redirecting you to the dashboard.",
     });
+    setLocation("/dashboard");
   };
 
   return (
@@ -30,7 +33,7 @@ export default function SignIn() {
           <Link href="/">
             <div className="inline-flex items-center gap-2 mb-4 hover-elevate px-3 py-2 rounded-md">
               <ShoppingCart className="h-8 w-8 text-primary" />
-              <span className="font-bold text-2xl">ModernPOS</span>
+              <span className="font-bold text-2xl">Pointsman POS</span>
             </div>
           </Link>
         </div>

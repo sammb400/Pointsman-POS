@@ -15,7 +15,7 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ShoppingCart className="h-6 w-6 text-primary" />
-            <span className="font-bold text-xl">ModernPOS</span>
+            <span className="font-bold text-xl">Pointsman POS</span>
           </div>
           <nav className="hidden md:flex items-center gap-6">
             <a href="#features" className="text-sm font-medium hover-elevate px-3 py-2 rounded-md">Features</a>

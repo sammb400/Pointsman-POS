@@ -87,9 +87,8 @@ export default async function runApp(
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
   server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
+    port: port,
+    host: "localhost",
   }, () => {
     log(`serving on port ${port}`);
   });
