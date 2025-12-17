@@ -1,13 +1,18 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { useAuth } from "./auth-context";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, onSnapshot, doc, updateDoc, writeBatch } from "firebase/firestore";
 
 export interface Product {
-  id: number;
+  id: string; // Firestore uses string IDs
   name: string;
   price: number;
   category: string;
   stock: number;
   image?: string;
   description?: string;
+  addedByUid: string;
+  addedByEmail: string;
 }
 
 export interface CartItem extends Product {
@@ -30,11 +35,11 @@ interface POSContextType {
   products: Product[];
   cart: CartItem[];
   sales: Sale[];
-  addProduct: (product: Omit<Product, "id">) => void;
-  updateProductStock: (productId: number, newStock: number) => void;
+  addProduct: (product: Omit<Product, "id" | "addedByUid" | "addedByEmail">) => Promise<void>;
+  updateProductStock: (productId: string, newStock: number) => Promise<void>;
   addToCart: (product: Product) => void;
-  updateCartQuantity: (productId: number, delta: number) => void;
-  removeFromCart: (productId: number) => void;
+  updateCartQuantity: (productId: string, delta: number) => void;
+  removeFromCart: (productId: string) => void;
   clearCart: () => void;
   finalizeSale: (paymentType: "Cash" | "Card", amountTendered?: number) => Sale | null;
   getCartTotals: () => { subtotal: number; tax: number; total: number };
@@ -47,28 +52,9 @@ const STORAGE_KEYS = {
   sales: "pos_sales",
 };
 
-// Initial mock products
-const initialProducts: Product[] = [
-  { id: 1, name: "Espresso", price: 3.50, category: "Beverages", stock: 100, image: "" },
-  { id: 2, name: "Cappuccino", price: 4.50, category: "Beverages", stock: 80, image: "" },
-  { id: 3, name: "Latte", price: 4.75, category: "Beverages", stock: 90, image: "" },
-  { id: 4, name: "Mocha", price: 5.25, category: "Beverages", stock: 60, image: "" },
-  { id: 5, name: "Croissant", price: 3.25, category: "Pastries", stock: 25, image: "" },
-  { id: 6, name: "Muffin", price: 2.95, category: "Pastries", stock: 30, image: "" },
-  { id: 7, name: "Bagel", price: 2.50, category: "Pastries", stock: 40, image: "" },
-  { id: 8, name: "Cookie", price: 1.95, category: "Pastries", stock: 50, image: "" },
-  { id: 9, name: "Sandwich", price: 7.95, category: "Food", stock: 20, image: "" },
-  { id: 10, name: "Salad", price: 8.50, category: "Food", stock: 15, image: "" },
-  { id: 11, name: "Soup", price: 5.95, category: "Food", stock: 18, image: "" },
-  { id: 12, name: "Water", price: 1.50, category: "Beverages", stock: 200, image: "" },
-];
-
 export function POSProvider({ children }: { children: ReactNode }) {
-  const [products, setProducts] = useState<Product[]>(() => {
-    const stored = localStorage.getItem(STORAGE_KEYS.products);
-    return stored ? JSON.parse(stored) : initialProducts;
-  });
-
+  const { currentUser } = useAuth();
+  const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
 
   const [sales, setSales] = useState<Sale[]>(() => {
@@ -76,26 +62,46 @@ export function POSProvider({ children }: { children: ReactNode }) {
     return stored ? JSON.parse(stored) : [];
   });
 
-  // Persist products to localStorage
+  // Fetch products from Firestore in real-time
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.products, JSON.stringify(products));
-  }, [products]);
+    if (!currentUser) {
+      setProducts([]);
+      return;
+    }
+
+    const productsCollection = collection(db, "businesses", currentUser.uid, "products");
+    const unsubscribe = onSnapshot(productsCollection, (snapshot) => {
+      const productsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      } as Product));
+      setProducts(productsData);
+    });
+
+    return () => unsubscribe();
+  }, [currentUser]);
 
   // Persist sales to localStorage
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.sales, JSON.stringify(sales));
   }, [sales]);
 
-  const addProduct = (product: Omit<Product, "id">) => {
-    const newId = Math.max(...products.map(p => p.id), 0) + 1;
-    const newProduct: Product = { ...product, id: newId };
-    setProducts(prev => [...prev, newProduct]);
+  const addProduct = async (product: Omit<Product, "id" | "addedByUid" | "addedByEmail">) => {
+    if (!currentUser) throw new Error("No user logged in to add product.");
+
+    const productData = {
+      ...product,
+      addedByUid: currentUser.uid,
+      addedByEmail: currentUser.email || "Unknown", // Fallback if email is not available
+    };
+    const productsCollection = collection(db, "businesses", currentUser.uid, "products");
+    await addDoc(productsCollection, productData);
   };
 
-  const updateProductStock = (productId: number, newStock: number) => {
-    setProducts(prev =>
-      prev.map(p => (p.id === productId ? { ...p, stock: newStock } : p))
-    );
+  const updateProductStock = async (productId: string, newStock: number) => {
+    if (!currentUser) throw new Error("No user logged in to update stock.");
+    const productDoc = doc(db, "businesses", currentUser.uid, "products", productId);
+    await updateDoc(productDoc, { stock: newStock });
   };
 
   const addToCart = (product: Product) => {
@@ -116,7 +122,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const updateCartQuantity = (productId: number, delta: number) => {
+  const updateCartQuantity = (productId: string, delta: number) => {
     setCart(prev => {
       const product = products.find(p => p.id === productId);
       return prev
@@ -135,7 +141,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const removeFromCart = (productId: number) => {
+  const removeFromCart = (productId: string) => {
     setCart(prev => prev.filter(item => item.id !== productId));
   };
 

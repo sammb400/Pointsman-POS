@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import DashboardLayout from "@/components/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,9 +18,16 @@ interface FormErrors {
   category?: string;
 }
 
+// Declare the cloudinary object on the window
+declare global {
+  interface Window {
+    cloudinary: any;
+  }
+}
+
 export default function AddProduct() {
   const { toast } = useToast();
-  const { addProduct } = usePOS();
+  const { addProduct, products } = usePOS();
   
   const [formData, setFormData] = useState({
     name: "",
@@ -32,6 +39,8 @@ export default function AddProduct() {
   });
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
+  const [isUploading, setIsUploading] = useState(false);
+  const cloudinaryWidget = useRef<any>(null);
 
   const handleChange = (field: string) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -50,39 +59,29 @@ export default function AddProduct() {
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (!file.type.startsWith("image/")) {
-        toast({
-          title: "Invalid File",
-          description: "Please upload an image file.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      if (file.size > 5 * 1024 * 1024) {
-        toast({
-          title: "File Too Large",
-          description: "Image must be less than 5MB.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        setImagePreview(result);
-        setFormData(prev => ({ ...prev, image: result }));
-      };
-      reader.readAsDataURL(file);
+  useEffect(() => {
+    // Initialize the widget when the component mounts
+    if (window.cloudinary) {
+      cloudinaryWidget.current = window.cloudinary.createUploadWidget(
+        {
+          cloudName: import.meta.env.VITE_CLOUDINARY_CLOUD_NAME,
+          uploadPreset: import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET,
+          sources: ["local", "url", "camera"],
+          multiple: false,
+        },
+        (error: any, result: any) => {
+          if (!error && result && result.event === "success") {
+            const secureUrl = result.info.secure_url;
+            setFormData(prev => ({ ...prev, image: secureUrl }));
+            setImagePreview(secureUrl);
+          }
+        }
+      );
     }
-  };
+  }, []);
 
   const handleImageUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const url = e.target.value;
+    const url = e.target.value.trim();
     setFormData(prev => ({ ...prev, image: url }));
     setImagePreview(url || null);
   };
@@ -121,7 +120,7 @@ export default function AddProduct() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validateForm()) {
@@ -133,15 +132,22 @@ export default function AddProduct() {
       return;
     }
 
-    addProduct({
-      name: formData.name.trim(),
-      price: parseFloat(formData.price),
-      stock: parseInt(formData.stock),
-      category: formData.category.charAt(0).toUpperCase() + formData.category.slice(1),
-      description: formData.description.trim(),
-      image: formData.image,
-    });
-
+    setIsUploading(true);
+    try {
+      await addProduct({
+        name: formData.name.trim(),
+        price: parseFloat(formData.price),
+        stock: parseInt(formData.stock),
+        category: formData.category.charAt(0).toUpperCase() + formData.category.slice(1),
+        description: formData.description.trim(),
+        image: formData.image,
+      });
+    } catch (error) {
+      console.error("Failed to add product:", error);
+      toast({ title: "Error", description: "Could not add product. Please try again.", variant: "destructive" });
+      setIsUploading(false);
+      return;
+    }
     toast({
       title: "Product Added!",
       description: `${formData.name} has been added to inventory with ${formData.stock} units.`,
@@ -158,6 +164,7 @@ export default function AddProduct() {
     });
     setImagePreview(null);
     setErrors({});
+    setIsUploading(false);
   };
 
   return (
@@ -221,27 +228,15 @@ export default function AddProduct() {
                   
                   <div className="flex-1 space-y-3">
                     {/* File Upload */}
-                    <div>
-                      <Label htmlFor="imageUpload" className="text-sm text-muted-foreground">
-                        Upload Image
-                      </Label>
-                      <div className="mt-1">
-                        <label htmlFor="imageUpload" className="cursor-pointer">
-                          <div className="flex items-center gap-2 px-3 py-2 border rounded-md hover-elevate">
-                            <Upload className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm">Choose file...</span>
-                          </div>
-                          <input
-                            id="imageUpload"
-                            type="file"
-                            accept="image/*"
-                            onChange={handleImageUpload}
-                            className="hidden"
-                            data-testid="input-image-upload"
-                          />
-                        </label>
-                      </div>
-                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => cloudinaryWidget.current?.open()}
+                      className="w-full"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload an Image
+                    </Button>
                     
                     {/* Or URL Input */}
                     <div>
@@ -252,7 +247,7 @@ export default function AddProduct() {
                         id="imageUrl"
                         type="url"
                         placeholder="https://example.com/image.jpg"
-                        value={formData.image.startsWith("data:") ? "" : formData.image}
+                        value={formData.image}
                         onChange={handleImageUrlChange}
                         className="mt-1"
                         data-testid="input-image-url"
@@ -349,9 +344,9 @@ export default function AddProduct() {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 pt-4">
-                <Button type="submit" className="h-12 flex-1" data-testid="button-add-product">
+                <Button type="submit" className="h-12 flex-1" data-testid="button-add-product" disabled={isUploading}>
                   <Package className="h-4 w-4 mr-2" />
-                  Add Product
+                  {isUploading ? "Adding Product..." : "Add Product"}
                 </Button>
                 <Link href="/dashboard">
                   <Button 
