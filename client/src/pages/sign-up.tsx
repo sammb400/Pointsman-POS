@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ShoppingCart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/auth-context";
 
 export default function SignUp() {
   const [formData, setFormData] = useState({
@@ -15,16 +16,29 @@ export default function SignUp() {
     phone: "",
     password: "",
     confirmPassword: "",
+    accessCode: "",
   });
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { signup } = useAuth();
+  const [, setLocation] = useLocation();
 
   const handleChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({ ...prev, [field]: e.target.value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (formData.accessCode !== "007") {
+      toast({
+        title: "Invalid Access Code",
+        description: "The provided access code is incorrect.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (formData.password !== formData.confirmPassword) {
       toast({
         title: "Error",
@@ -41,11 +55,27 @@ export default function SignUp() {
       });
       return;
     }
-    console.log("Sign up attempted", formData);
-    toast({
-      title: "Account Created!",
-      description: `Welcome to ModernPOS, ${formData.businessName}!`,
-    });
+
+    setIsLoading(true);
+    try {
+      await signup({
+        email: formData.email,
+        password: formData.password,
+        businessName: formData.businessName,
+        phoneNumber: formData.phone,
+      });
+      toast({
+        title: "Account Created!",
+        description: `Welcome to Pointsman POS, ${formData.businessName}!`,
+      });
+      setLocation("/dashboard"); // Redirect to dashboard after successful signup
+    } catch (error: any) {
+      console.error("Signup failed:", error);
+      const message = error.code === 'auth/email-already-in-use' ? 'This email is already registered.' : 'Failed to create an account.';
+      toast({ title: "Sign-up Error", description: message, variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -79,6 +109,19 @@ export default function SignUp() {
                   onChange={handleChange("businessName")}
                   required
                   data-testid="input-business-name"
+                  className="h-12"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="accessCode">Access Code</Label>
+                <Input
+                  id="accessCode"
+                  type="password"
+                  placeholder="Enter access code"
+                  value={formData.accessCode}
+                  onChange={handleChange("accessCode")}
+                  required
+                  data-testid="input-access-code"
                   className="h-12"
                 />
               </div>
@@ -156,8 +199,8 @@ export default function SignUp() {
                   </a>
                 </Label>
               </div>
-              <Button type="submit" className="w-full h-12" data-testid="button-submit">
-                Create Account
+              <Button type="submit" className="w-full h-12" data-testid="button-submit" disabled={isLoading}>
+                {isLoading ? "Creating Account..." : "Create Account"}
               </Button>
             </form>
 

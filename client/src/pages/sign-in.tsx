@@ -7,23 +7,41 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ShoppingCart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/auth-context";
 
 export default function SignIn() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const { login } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Sign in attempted", { email, rememberMe });
-    // Here you would typically perform your authentication logic
-    toast({
-      title: "Sign In Successful",
-      description: "Welcome back! Redirecting you to the dashboard.",
-    });
-    setLocation("/dashboard");
+    setIsLoading(true);
+    try {
+      await login(email, password);
+      toast({
+        title: "Sign In Successful",
+        description: "Welcome back! Redirecting you to the dashboard.",
+      });
+      setLocation("/dashboard");
+    } catch (error: any) {
+      console.error("Sign in failed:", error);
+      let description = "An unknown error occurred. Please try again.";
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        description = "Invalid email or password. Please check your credentials.";
+      }
+      toast({
+        title: "Sign In Failed",
+        description,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -92,8 +110,8 @@ export default function SignIn() {
                   Forgot password?
                 </a>
               </div>
-              <Button type="submit" className="w-full h-12" data-testid="button-submit">
-                Sign In
+              <Button type="submit" className="w-full h-12" data-testid="button-submit" disabled={isLoading}>
+                {isLoading ? "Signing In..." : "Sign In"}
               </Button>
             </form>
 

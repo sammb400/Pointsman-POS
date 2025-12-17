@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { useAuth } from "@/context/auth-context";
+import { useToast } from "@/hooks/use-toast";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -29,9 +31,24 @@ const navItems = [
 ];
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { logout } = useAuth();
+  const { toast } = useToast();
+
+  const handleSignOut = async () => {
+    try {
+      await logout();
+      toast({
+        title: "Signed Out",
+        description: "You have been successfully signed out.",
+      });
+      setLocation("/");
+    } catch (error) {
+      toast({ title: "Sign Out Failed", description: "Could not sign out. Please try again.", variant: "destructive" });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -136,16 +153,17 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             {!collapsed && <span>Collapse</span>}
           </Button>
           <Link href="/">
-            <Button
-              variant="ghost"
-              size="sm"
-              className={`w-full justify-start gap-3 text-destructive hover:text-destructive ${collapsed ? "px-3" : ""}`}
-              data-testid="button-logout"
-            >
-              <LogOut className="h-5 w-5" />
-              {!collapsed && <span>Sign Out</span>}
-            </Button>
           </Link>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`w-full justify-start gap-3 text-destructive hover:text-destructive ${collapsed ? "px-3" : ""}`}
+            data-testid="button-logout"
+            onClick={handleSignOut}
+          >
+            <LogOut className="h-5 w-5" />
+            {!collapsed && <span>Sign Out</span>}
+          </Button>
         </div>
       </aside>
 
