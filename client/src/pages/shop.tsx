@@ -32,7 +32,7 @@ export default function Shop() {
   const changeDue = paymentType === "Cash" ? tenderedAmount - total : 0;
   const canFinalize = cart.length > 0 && (paymentType === "Card" || tenderedAmount >= total);
 
-  const handleFinalizeSale = () => {
+  const handleFinalizeSale = async () => {
     if (!canFinalize) {
       toast({
         title: "Cannot Complete Sale",
@@ -44,7 +44,11 @@ export default function Shop() {
       return;
     }
 
-    const sale = finalizeSale(paymentType, paymentType === "Cash" ? tenderedAmount : undefined);
+    // Pass the current cart to finalizeSale so it can update stock
+    const sale = await finalizeSale(
+      cart, 
+      paymentType, 
+      paymentType === "Cash" ? tenderedAmount : undefined);
     
     if (sale) {
       toast({

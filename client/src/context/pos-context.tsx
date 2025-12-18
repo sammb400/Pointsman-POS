@@ -38,24 +38,32 @@ interface POSContextType {
   addProduct: (product: Omit<Product, "id" | "addedByUid" | "addedByEmail">) => Promise<void>;
   updateProductStock: (productId: string, newStock: number) => Promise<void>;
   addToCart: (product: Product) => void;
-  updateCartQuantity: (productId: string, delta: number) => void;
+  updateCartQuantity: (productId: string, change: number) => void;
   removeFromCart: (productId: string) => void;
   clearCart: () => void;
-  finalizeSale: (paymentType: "Cash" | "Card", amountTendered?: number) => Sale | null;
+  finalizeSale: (cart: CartItem[], paymentType: "Cash" | "Card", amountTendered?: number) => Promise<Sale | null>;
   getCartTotals: () => { subtotal: number; tax: number; total: number };
 }
 
 const POSContext = createContext<POSContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  products: "pos_products",
+  cart: "pos_cart",
   sales: "pos_sales",
 };
 
 export function POSProvider({ children }: { children: ReactNode }) {
   const { currentUser } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.cart);
+      return stored ? JSON.parse(stored) : [];
+    } catch (error) {
+      console.error("Failed to load cart from localStorage:", error);
+      return [];
+    }
+  });
 
   const [sales, setSales] = useState<Sale[]>(() => {
     const stored = localStorage.getItem(STORAGE_KEYS.sales);
@@ -80,6 +88,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
     return () => unsubscribe();
   }, [currentUser]);
+
+  // Persist cart to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.cart, JSON.stringify(cart));
+    } catch (error) {
+      console.error("Failed to save cart to localStorage:", error);
+    }
+  }, [cart]);
 
   // Persist sales to localStorage
   useEffect(() => {
@@ -122,15 +139,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const updateCartQuantity = (productId: string, delta: number) => {
+  const updateCartQuantity = (productId: string, change: number) => {
     setCart(prev => {
       const product = products.find(p => p.id === productId);
       return prev
         .map(item => {
           if (item.id === productId) {
-            const newQuantity = item.quantity + delta;
+            const newQuantity = item.quantity + change;
             // Check stock limit when increasing
-            if (delta > 0 && product && newQuantity > product.stock) {
+            if (change > 0 && product && newQuantity > product.stock) {
               return item;
             }
             return { ...item, quantity: Math.max(0, newQuantity) };
@@ -156,9 +173,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
     return { subtotal, tax, total };
   };
 
-  const finalizeSale = (paymentType: "Cash" | "Card", amountTendered?: number): Sale | null => {
+  const finalizeSale = async (cart: CartItem[], paymentType: "Cash" | "Card", amountTendered?: number): Promise<Sale | null> => {
     if (cart.length === 0) return null;
-
+    if (!currentUser) throw new Error("User must be logged in to finalize a sale.");
+  
     const { subtotal, tax, total } = getCartTotals();
     
     // Calculate change for cash payments
@@ -179,14 +197,20 @@ export function POSProvider({ children }: { children: ReactNode }) {
       changeDue: paymentType === "Cash" ? changeDue : undefined,
     };
 
-    // Reduce stock for each item sold
-    cart.forEach(item => {
-      const product = products.find(p => p.id === item.id);
-      if (product) {
-        updateProductStock(product.id, product.stock - item.quantity);
-      }
-    });
-
+    // Use a batched write to update all product stocks atomically
+    try {
+      const batch = writeBatch(db);
+      cart.forEach(item => {
+        const productRef = doc(db, "businesses", currentUser.uid, "products", item.id);
+        const newStock = item.stock - item.quantity;
+        batch.update(productRef, { stock: newStock });
+      });
+      await batch.commit();
+    } catch (error) {
+      console.error("Failed to update stock levels:", error);
+      return null; // Return null to indicate the sale failed
+    }
+    
     // Add to sales history
     setSales(prev => [sale, ...prev]);
 
