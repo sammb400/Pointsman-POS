@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useMemo, type ReactNode } from "react";
 import { useAuth } from "./auth-context";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, onSnapshot, doc, updateDoc, writeBatch } from "firebase/firestore";
@@ -29,6 +29,8 @@ export interface Sale {
   paymentType: "Cash" | "Card";
   amountTendered?: number;
   changeDue?: number;
+  soldByUid: string;
+  soldByEmail: string;
 }
 
 interface POSContextType {
@@ -166,18 +168,20 @@ export function POSProvider({ children }: { children: ReactNode }) {
     setCart([]);
   };
 
-  const getCartTotals = () => {
-    const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const tax = subtotal * 0.08;
-    const total = subtotal + tax;
-    return { subtotal, tax, total };
-  };
+  const getCartTotals = useMemo(() => {
+    return () => {
+      const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      const tax = subtotal * 0.08;
+      const total = subtotal + tax;
+      return { subtotal, tax, total };
+    }
+  }, [cart]);
 
   const finalizeSale = async (cart: CartItem[], paymentType: "Cash" | "Card", amountTendered?: number): Promise<Sale | null> => {
     if (cart.length === 0) return null;
     if (!currentUser) throw new Error("User must be logged in to finalize a sale.");
   
-    const { subtotal, tax, total } = getCartTotals();
+    const { subtotal, tax, total } = getCartTotals(); // This now uses the memoized function
     
     // Calculate change for cash payments
     const changeDue = paymentType === "Cash" && amountTendered 
@@ -195,6 +199,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
       paymentType,
       amountTendered: paymentType === "Cash" ? amountTendered : undefined,
       changeDue: paymentType === "Cash" ? changeDue : undefined,
+      soldByUid: currentUser.uid,
+      soldByEmail: currentUser.email || "Unknown",
     };
 
     // Use a batched write to update all product stocks atomically
@@ -202,9 +208,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
       const batch = writeBatch(db);
       cart.forEach(item => {
         const productRef = doc(db, "businesses", currentUser.uid, "products", item.id);
-        const newStock = item.stock - item.quantity;
-        batch.update(productRef, { stock: newStock });
+        // It's safer to read the latest stock from the `products` state
+        // to avoid using stale stock data from the cart item.
+        const productInState = products.find(p => p.id === item.id);
+        if (productInState) {
+          const newStock = productInState.stock - item.quantity;
+          batch.update(productRef, { stock: newStock });
+        }
       });
+      // Also add the new sale to the batch
+      const salesCollection = collection(db, "businesses", currentUser.uid, "sales");
+      batch.set(doc(salesCollection, sale.id), sale);
+
       await batch.commit();
     } catch (error) {
       console.error("Failed to update stock levels:", error);
