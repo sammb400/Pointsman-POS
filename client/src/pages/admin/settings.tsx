@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AdminLayout from "@/components/admin-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,33 +6,59 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Settings, Store, Palette, Bell, Shield, Save } from "lucide-react";
+import { Settings, Store, Bell, Shield, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { usePOS } from "@/context/pos-context";
 
 export default function AdminSettings() {
   const { toast } = useToast();
+  const { settings: contextSettings, updateSettings } = usePOS();
   
-  const [settings, setSettings] = useState({
+  // Local state for form handling
+  const [formData, setFormData] = useState({
     storeName: "ModernPOS Store",
-    currency: "USD",
-    taxRate: "8",
+    currency: "KES",
+    taxRate: "16",
     accentColor: "#FF6347",
+    backgroundColor: "#ffffff",
     enableNotifications: true,
     enableLowStockAlerts: true,
     lowStockThreshold: "10",
     requireManagerApproval: false,
   });
 
+  // Sync local state with context settings when they load
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      ...contextSettings,
+      taxRate: contextSettings.taxRate.toString(),
+      lowStockThreshold: contextSettings.lowStockThreshold.toString(),
+    }));
+  }, [contextSettings]);
+
   const handleChange = (field: string, value: string | boolean) => {
-    setSettings(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSave = () => {
-    console.log("Settings saved:", settings);
-    toast({
-      title: "Settings Saved",
-      description: "Your system settings have been updated successfully.",
-    });
+  const handleSave = async () => {
+    try {
+      await updateSettings({
+        ...formData,
+        taxRate: parseFloat(formData.taxRate),
+        lowStockThreshold: parseInt(formData.lowStockThreshold),
+      });
+      toast({
+        title: "Settings Saved",
+        description: "Your system settings have been updated successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save settings.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -60,7 +86,7 @@ export default function AdminSettings() {
               <Label htmlFor="storeName">Store Name</Label>
               <Input
                 id="storeName"
-                value={settings.storeName}
+                value={formData.storeName}
                 onChange={(e) => handleChange("storeName", e.target.value)}
                 placeholder="Enter store name"
                 data-testid="input-store-name"
@@ -70,11 +96,12 @@ export default function AdminSettings() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="currency">Currency</Label>
-                <Select value={settings.currency} onValueChange={(value) => handleChange("currency", value)}>
+                <Select value={formData.currency} onValueChange={(value) => handleChange("currency", value)}>
                   <SelectTrigger data-testid="select-currency">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="KES">KES (KSh)</SelectItem>
                     <SelectItem value="USD">USD ($)</SelectItem>
                     <SelectItem value="EUR">EUR (€)</SelectItem>
                     <SelectItem value="GBP">GBP (£)</SelectItem>
@@ -92,50 +119,11 @@ export default function AdminSettings() {
                   min="0"
                   max="100"
                   step="0.1"
-                  value={settings.taxRate}
+                  value={formData.taxRate}
                   onChange={(e) => handleChange("taxRate", e.target.value)}
                   data-testid="input-tax-rate"
                 />
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Appearance */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Palette className="h-5 w-5" />
-              Appearance
-            </CardTitle>
-            <CardDescription>Customize the look and feel of your POS system</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="accentColor">Accent Color</Label>
-              <div className="flex gap-3 items-center">
-                <Input
-                  id="accentColor"
-                  type="color"
-                  value={settings.accentColor}
-                  onChange={(e) => handleChange("accentColor", e.target.value)}
-                  className="w-16 h-10 p-1 cursor-pointer"
-                  data-testid="input-accent-color"
-                />
-                <Input
-                  value={settings.accentColor}
-                  onChange={(e) => handleChange("accentColor", e.target.value)}
-                  placeholder="#FF6347"
-                  className="flex-1"
-                />
-                <div 
-                  className="w-10 h-10 rounded-md border"
-                  style={{ backgroundColor: settings.accentColor }}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                This color will be used for buttons, links, and highlights throughout the app.
-              </p>
             </div>
           </CardContent>
         </Card>
@@ -157,7 +145,7 @@ export default function AdminSettings() {
               </div>
               <Switch
                 id="enableNotifications"
-                checked={settings.enableNotifications}
+                checked={formData.enableNotifications}
                 onCheckedChange={(checked) => handleChange("enableNotifications", checked)}
                 data-testid="switch-notifications"
               />
@@ -170,20 +158,20 @@ export default function AdminSettings() {
               </div>
               <Switch
                 id="enableLowStockAlerts"
-                checked={settings.enableLowStockAlerts}
+                checked={formData.enableLowStockAlerts}
                 onCheckedChange={(checked) => handleChange("enableLowStockAlerts", checked)}
                 data-testid="switch-low-stock"
               />
             </div>
             
-            {settings.enableLowStockAlerts && (
+            {formData.enableLowStockAlerts && (
               <div className="space-y-2 pl-4 border-l-2 border-primary/20">
                 <Label htmlFor="lowStockThreshold">Low Stock Threshold</Label>
                 <Input
                   id="lowStockThreshold"
                   type="number"
                   min="1"
-                  value={settings.lowStockThreshold}
+                  value={formData.lowStockThreshold}
                   onChange={(e) => handleChange("lowStockThreshold", e.target.value)}
                   className="max-w-[120px]"
                   data-testid="input-low-stock-threshold"
@@ -215,7 +203,7 @@ export default function AdminSettings() {
               </div>
               <Switch
                 id="requireManagerApproval"
-                checked={settings.requireManagerApproval}
+                checked={formData.requireManagerApproval}
                 onCheckedChange={(checked) => handleChange("requireManagerApproval", checked)}
                 data-testid="switch-manager-approval"
               />

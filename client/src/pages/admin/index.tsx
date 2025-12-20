@@ -2,11 +2,14 @@ import AdminLayout from "@/components/admin-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "wouter";
 import { Users, Package, DollarSign, Settings, ArrowRight, Shield, AlertTriangle } from "lucide-react";
+import { usePOS } from "@/context/pos-context";
 
 export default function AdminPortal() {
+  const { employees } = usePOS();
+
   const adminSections = [
     {
-      title: "View All Employees",
+      title: `View All Employees (${employees.length})`,
       description: "Manage employee records, roles, and access permissions",
       icon: Users,
       path: "/dashboard/admin/employees",

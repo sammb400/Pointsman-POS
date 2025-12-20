@@ -34,7 +34,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [location, setLocation] = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { logout } = useAuth();
+  const { logout, userRole } = useAuth();
   const { toast } = useToast();
 
   const handleSignOut = async () => {
@@ -114,30 +114,32 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           })}
           
           {/* Admin Section Divider */}
-          <div className="pt-4 mt-4 border-t">
-            {!collapsed && (
-              <p className="px-3 text-xs font-medium text-muted-foreground mb-2">ADMINISTRATION</p>
-            )}
-            {navItems.filter(item => item.isAdmin).map((item) => {
-              const isActive = location.startsWith(item.path);
-              return (
-                <Link key={item.path} href={item.path}>
-                  <div
-                    className={`
-                      flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors
-                      hover-elevate cursor-pointer
-                      ${isActive ? "bg-primary text-primary-foreground" : "text-primary"}
-                    `}
-                    onClick={() => setMobileOpen(false)}
-                    data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-                  >
-                    <item.icon className="h-5 w-5 flex-shrink-0" />
-                    {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
+          {userRole === "admin" && (
+            <div className="pt-4 mt-4 border-t">
+              {!collapsed && (
+                <p className="px-3 text-xs font-medium text-muted-foreground mb-2">ADMINISTRATION</p>
+              )}
+              {navItems.filter(item => item.isAdmin).map((item) => {
+                const isActive = location.startsWith(item.path);
+                return (
+                  <Link key={item.path} href={item.path}>
+                    <div
+                      className={`
+                        flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors
+                        hover-elevate cursor-pointer
+                        ${isActive ? "bg-primary text-primary-foreground" : "text-primary"}
+                      `}
+                      onClick={() => setMobileOpen(false)}
+                      data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                    >
+                      <item.icon className="h-5 w-5 flex-shrink-0" />
+                      {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </nav>
 
         {/* Footer */}

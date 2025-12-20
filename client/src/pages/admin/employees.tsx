@@ -3,23 +3,41 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UserPlus, MoreHorizontal, Mail, Phone, Search, Shield } from "lucide-react";
 import { useState } from "react";
+import { usePOS } from "@/context/pos-context";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AdminEmployees() {
+  const { employees, addEmployee } = usePOS();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [newEmployee, setNewEmployee] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    role: "Cashier",
+    status: "Active"
+  });
 
-  // todo: remove mock functionality - replace with real data from API
-  const employees = [
-    { id: 1, name: "Emily Johnson", email: "emily.j@store.com", phone: "(555) 123-4567", role: "Store Manager", status: "Active", accessLevel: "Admin" },
-    { id: 2, name: "Michael Chen", email: "m.chen@store.com", phone: "(555) 234-5678", role: "Cashier", status: "Active", accessLevel: "Standard" },
-    { id: 3, name: "Sarah Williams", email: "s.williams@store.com", phone: "(555) 345-6789", role: "Cashier", status: "Active", accessLevel: "Standard" },
-    { id: 4, name: "David Rodriguez", email: "d.rodriguez@store.com", phone: "(555) 456-7890", role: "Stock Associate", status: "Active", accessLevel: "Standard" },
-    { id: 5, name: "Jessica Brown", email: "j.brown@store.com", phone: "(555) 567-8901", role: "Cashier", status: "On Leave", accessLevel: "Standard" },
-    { id: 6, name: "Christopher Lee", email: "c.lee@store.com", phone: "(555) 678-9012", role: "Assistant Manager", status: "Active", accessLevel: "Manager" },
-    { id: 7, name: "Amanda Martinez", email: "a.martinez@store.com", phone: "(555) 789-0123", role: "Stock Associate", status: "Active", accessLevel: "Standard" },
-    { id: 8, name: "James Wilson", email: "j.wilson@store.com", phone: "(555) 890-1234", role: "Cashier", status: "Inactive", accessLevel: "Revoked" },
-  ];
+  const handleAddEmployee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await addEmployee(newEmployee);
+      setIsAddOpen(false);
+      setNewEmployee({ name: "", email: "", phone: "", role: "Cashier", status: "Active" });
+      toast({
+        title: "Employee Added",
+        description: `${newEmployee.name} has been added to the team.`,
+      });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to add employee.", variant: "destructive" });
+    }
+  };
 
   const filteredEmployees = employees.filter(emp =>
     emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -38,17 +56,11 @@ export default function AdminEmployees() {
     }
   };
 
-  const getAccessBadge = (level: string) => {
-    switch (level) {
-      case "Admin":
-        return <Badge className="bg-red-500 text-white">Admin</Badge>;
-      case "Manager":
-        return <Badge className="bg-orange-500 text-white">Manager</Badge>;
-      case "Revoked":
-        return <Badge variant="destructive">Revoked</Badge>;
-      default:
-        return <Badge variant="outline">Standard</Badge>;
-    }
+  const getAccessBadge = (role: string) => {
+    // Derive access level from role since it's not in DB yet
+    if (role === "Store Manager") return <Badge className="bg-red-500 text-white">Admin</Badge>;
+    if (role === "Assistant Manager") return <Badge className="bg-orange-500 text-white">Manager</Badge>;
+    return <Badge variant="outline">Standard</Badge>;
   };
 
   const getStatusColor = (status: string) => {
@@ -75,10 +87,63 @@ export default function AdminEmployees() {
             </h1>
             <p className="text-muted-foreground mt-1">View and manage all employee records and access levels.</p>
           </div>
-          <Button data-testid="button-add-employee">
-            <UserPlus className="h-4 w-4 mr-2" />
-            Add Employee
-          </Button>
+          
+          <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-add-employee">
+                <UserPlus className="h-4 w-4 mr-2" />
+                Add Employee
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Employee</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleAddEmployee} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Full Name</Label>
+                  <Input 
+                    id="name" 
+                    required 
+                    value={newEmployee.name}
+                    onChange={(e) => setNewEmployee({...newEmployee, name: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input 
+                    id="email" 
+                    type="email" 
+                    required 
+                    value={newEmployee.email}
+                    onChange={(e) => setNewEmployee({...newEmployee, email: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone</Label>
+                  <Input 
+                    id="phone" 
+                    required 
+                    value={newEmployee.phone}
+                    onChange={(e) => setNewEmployee({...newEmployee, phone: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="role">Role</Label>
+                  <Select value={newEmployee.role} onValueChange={(val) => setNewEmployee({...newEmployee, role: val})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Store Manager">Store Manager</SelectItem>
+                      <SelectItem value="Assistant Manager">Assistant Manager</SelectItem>
+                      <SelectItem value="Cashier">Cashier</SelectItem>
+                      <SelectItem value="Stock Associate">Stock Associate</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button type="submit" className="w-full">Save Employee</Button>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Search */}
@@ -131,7 +196,7 @@ export default function AdminEmployees() {
                         <Badge variant={getRoleBadgeVariant(employee.role)}>{employee.role}</Badge>
                       </td>
                       <td className="py-4 px-4">
-                        {getAccessBadge(employee.accessLevel)}
+                        {getAccessBadge(employee.role)}
                       </td>
                       <td className="py-4 px-4">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(employee.status)}`}>

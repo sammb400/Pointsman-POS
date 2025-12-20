@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useMemo, type ReactNode } from "react";
 import { useAuth } from "./auth-context";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, onSnapshot, doc, updateDoc, writeBatch } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, doc, updateDoc, writeBatch, setDoc, collectionGroup, query, where, getDocs, getDoc } from "firebase/firestore";
 
 export interface Product {
   id: string; // Firestore uses string IDs
@@ -45,13 +45,36 @@ export interface DashboardSummary {
   lowStockItems: Product[];
 }
 
+export interface Employee {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  status: string;
+}
+
+export interface Settings {
+  storeName: string;
+  currency: string;
+  taxRate: number;
+  enableNotifications: boolean;
+  enableLowStockAlerts: boolean;
+  lowStockThreshold: number;
+  requireManagerApproval: boolean;
+}
+
 interface POSContextType {
   products: Product[];
   cart: CartItem[];
   sales: Sale[];
+  settings: Settings;
+  updateSettings: (newSettings: Partial<Settings>) => Promise<void>;
   addProduct: (product: Omit<Product, "id" | "addedByUid" | "addedByEmail">) => Promise<void>;
   updateProductStock: (productId: string, newStock: number) => Promise<void>;
   addToCart: (product: Product) => void;
+  employees: Employee[];
+  addEmployee: (employee: Omit<Employee, "id">) => Promise<void>;
   updateCartQuantity: (productId: string, change: number) => void;
   removeFromCart: (productId: string) => void;
   clearCart: () => void;
@@ -69,7 +92,18 @@ const STORAGE_KEYS = {
 
 export function POSProvider({ children }: { children: ReactNode }) {
   const { currentUser } = useAuth();
+  const [businessId, setBusinessId] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [settings, setSettings] = useState<Settings>({
+    storeName: "ModernPOS Store",
+    currency: "KES",
+    taxRate: 16,
+    enableNotifications: true,
+    enableLowStockAlerts: true,
+    lowStockThreshold: 10,
+    requireManagerApproval: false,
+  });
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.cart);
@@ -85,15 +119,53 @@ export function POSProvider({ children }: { children: ReactNode }) {
     return stored ? JSON.parse(stored) : [];
   });
 
+  // Determine the correct business ID (Owner UID)
+  useEffect(() => {
+    const resolveBusinessId = async () => {
+      try {
+        if (!currentUser) {
+          setBusinessId(null);
+          return;
+        }
+
+        // 1. Check if the current user is an owner
+        const businessDocRef = doc(db, "businesses", currentUser.uid);
+        const businessDocSnap = await getDoc(businessDocRef);
+        
+        if (businessDocSnap.exists()) {
+          setBusinessId(currentUser.uid);
+          return;
+        }
+
+        // 2. Check if the current user is an employee
+        if (currentUser.email) {
+          const q = query(collectionGroup(db, "employees"), where("email", "==", currentUser.email));
+          const querySnapshot = await getDocs(q);
+          
+          if (!querySnapshot.empty) {
+            const ownerUid = querySnapshot.docs[0].ref.parent.parent?.id;
+            if (ownerUid) setBusinessId(ownerUid);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to resolve business ID:", error);
+      }
+    };
+
+    resolveBusinessId();
+  }, [currentUser]);
+
   // Fetch products from Firestore in real-time
   useEffect(() => {
-    if (!currentUser) {
+    if (!currentUser || !businessId) {
       setProducts([]);
+      setEmployees([]);
       return;
     }
 
-    const productsCollection = collection(db, "businesses", currentUser.uid, "products");
-    const unsubscribe = onSnapshot(productsCollection, (snapshot) => {
+    // Fetch Products
+    const productsCollection = collection(db, "businesses", businessId, "products");
+    const unsubscribeProducts = onSnapshot(productsCollection, (snapshot) => {
       const productsData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
@@ -101,8 +173,33 @@ export function POSProvider({ children }: { children: ReactNode }) {
       setProducts(productsData);
     });
 
-    return () => unsubscribe();
-  }, [currentUser]);
+    // Fetch Employees
+    const employeesCollection = collection(db, "businesses", businessId, "employees");
+    const unsubscribeEmployees = onSnapshot(employeesCollection, (snapshot) => {
+      const employeesData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      } as Employee));
+      setEmployees(employeesData);
+    });
+
+    // Fetch Settings
+    const businessDoc = doc(db, "businesses", businessId);
+    const unsubscribeSettings = onSnapshot(businessDoc, (docSnapshot) => {
+      if (docSnapshot.exists()) {
+        const data = docSnapshot.data();
+        if (data.settings) {
+          setSettings(prev => ({ ...prev, ...data.settings }));
+        }
+      }
+    });
+
+    return () => {
+      unsubscribeProducts();
+      unsubscribeEmployees();
+      unsubscribeSettings();
+    };
+  }, [currentUser, businessId]);
 
   // Persist cart to localStorage
   useEffect(() => {
@@ -118,22 +215,36 @@ export function POSProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_KEYS.sales, JSON.stringify(sales));
   }, [sales]);
 
+  const updateSettings = async (newSettings: Partial<Settings>) => {
+    if (!currentUser || !businessId) return;
+    const businessDoc = doc(db, "businesses", businessId);
+    // Merge with existing settings in Firestore
+    await setDoc(businessDoc, { settings: newSettings }, { merge: true });
+    // State will update automatically via the onSnapshot listener
+  };
+
   const addProduct = async (product: Omit<Product, "id" | "addedByUid" | "addedByEmail">) => {
-    if (!currentUser) throw new Error("No user logged in to add product.");
+    if (!currentUser || !businessId) throw new Error("No user logged in to add product.");
 
     const productData = {
       ...product,
       addedByUid: currentUser.uid,
       addedByEmail: currentUser.email || "Unknown", // Fallback if email is not available
     };
-    const productsCollection = collection(db, "businesses", currentUser.uid, "products");
+    const productsCollection = collection(db, "businesses", businessId, "products");
     await addDoc(productsCollection, productData);
   };
 
   const updateProductStock = async (productId: string, newStock: number) => {
-    if (!currentUser) throw new Error("No user logged in to update stock.");
-    const productDoc = doc(db, "businesses", currentUser.uid, "products", productId);
+    if (!currentUser || !businessId) throw new Error("No user logged in to update stock.");
+    const productDoc = doc(db, "businesses", businessId, "products", productId);
     await updateDoc(productDoc, { stock: newStock });
+  };
+
+  const addEmployee = async (employee: Omit<Employee, "id">) => {
+    if (!currentUser || !businessId) throw new Error("No user logged in to add employee.");
+    const employeesCollection = collection(db, "businesses", businessId, "employees");
+    await addDoc(employeesCollection, employee);
   };
 
   const addToCart = (product: Product) => {
@@ -184,15 +295,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const getCartTotals = useMemo(() => {
     return () => {
       const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-      const tax = subtotal * 0.08;
+      const tax = subtotal * (settings.taxRate / 100);
       const total = subtotal + tax;
       return { subtotal, tax, total };
     }
-  }, [cart]);
+  }, [cart, settings.taxRate]);
 
   const finalizeSale = async (cart: CartItem[], paymentType: "Cash" | "Card", amountTendered?: number): Promise<Sale | null> => {
     if (cart.length === 0) return null;
-    if (!currentUser) throw new Error("User must be logged in to finalize a sale.");
+    if (!currentUser || !businessId) throw new Error("User must be logged in to finalize a sale.");
   
     const { subtotal, tax, total } = getCartTotals(); // This now uses the memoized function
     
@@ -220,7 +331,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     try {
       const batch = writeBatch(db);
       cart.forEach(item => {
-        const productRef = doc(db, "businesses", currentUser.uid, "products", item.id);
+        const productRef = doc(db, "businesses", businessId, "products", item.id);
         // It's safer to read the latest stock from the `products` state
         // to avoid using stale stock data from the cart item.
         const productInState = products.find(p => p.id === item.id);
@@ -230,7 +341,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         }
       });
       // Also add the new sale to the batch
-      const salesCollection = collection(db, "businesses", currentUser.uid, "sales");
+      const salesCollection = collection(db, "businesses", businessId, "sales");
       batch.set(doc(salesCollection, sale.id), sale);
 
       await batch.commit();
@@ -271,7 +382,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       }, { revenue: 0, transactions: 0 });
 
       const lowStockItems = products
-        .filter(p => p.stock > 0 && p.stock <= 5)
+        .filter(p => p.stock > 0 && p.stock <= settings.lowStockThreshold)
         .sort((a, b) => a.stock - b.stock);
 
       return {
@@ -280,7 +391,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         lowStockItems,
       };
     }
-  }, [sales, products]);
+  }, [sales, products, settings.lowStockThreshold]);
 
   return (
     <POSContext.Provider
@@ -288,6 +399,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
         products,
         cart,
         sales,
+        employees,
+        settings,
+        updateSettings,
+        addEmployee,
         addProduct,
         updateProductStock,
         addToCart,

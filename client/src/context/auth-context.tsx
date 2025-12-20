@@ -6,7 +6,7 @@ import {
   signInWithEmailAndPassword,
   signOut
 } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase'; // Use your configured firebase instances
 
 interface SignupData {
@@ -18,6 +18,7 @@ interface SignupData {
 
 interface AuthContextType {
   currentUser: User | null;
+  userRole: string | null;
   loading: boolean;
   signup: (data: SignupData) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
@@ -36,6 +37,7 @@ export function useAuth() {
 
 export function AuthProvider({ children }: PropsWithChildren<{}>) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   async function signup({ email, password, businessName, phoneNumber }: SignupData) {
@@ -65,8 +67,22 @@ export function AuthProvider({ children }: PropsWithChildren<{}>) {
 
   useEffect(() => {
     // onAuthStateChanged returns an unsubscribe function
-    const unsubscribe = onAuthStateChanged(auth, user => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
+      
+      if (user) {
+        try {
+          const userDoc = await getDoc(doc(db, "businesses", user.uid));
+          if (userDoc.exists()) {
+            setUserRole(userDoc.data().role);
+          }
+        } catch (error) {
+          console.error("Error fetching user role:", error);
+        }
+      } else {
+        setUserRole(null);
+      }
+
       setLoading(false);
     });
 
@@ -76,6 +92,7 @@ export function AuthProvider({ children }: PropsWithChildren<{}>) {
 
   const value: AuthContextType = {
     currentUser,
+    userRole,
     loading,
     signup,
     login,

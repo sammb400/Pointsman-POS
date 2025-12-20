@@ -4,7 +4,7 @@ import { DollarSign, ShoppingBag, Package, TrendingUp, ArrowUpRight } from "luci
 import { usePOS } from "@/context/pos-context";
 
 export default function Dashboard() {
-  const { products, sales } = usePOS();
+  const { products, sales, settings } = usePOS();
 
   const totalRevenue = sales.reduce((sum, sale) => sum + sale.total, 0);
   const totalOrders = sales.length;
@@ -49,7 +49,7 @@ export default function Dashboard() {
   }));
 
   // Low stock products
-  const lowStockProducts = products.filter(p => p.stock <= 10).slice(0, 5);
+  const lowStockProducts = products.filter(p => p.stock <= settings.lowStockThreshold).slice(0, 5);
 
   return (
     <DashboardLayout>

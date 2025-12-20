@@ -11,7 +11,7 @@ import { usePOS } from "@/context/pos-context";
 
 export default function Shop() {
   const { toast } = useToast();
-  const { products, cart, addToCart, updateCartQuantity, removeFromCart, clearCart, finalizeSale, getCartTotals } = usePOS();
+  const { products, cart, addToCart, updateCartQuantity, removeFromCart, clearCart, finalizeSale, getCartTotals, settings } = usePOS();
   
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -247,7 +247,7 @@ export default function Shop() {
                         <span>Kes {subtotal.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Tax (8%)</span>
+                        <span className="text-muted-foreground">Tax ({settings.taxRate}%)</span>
                         <span>Kes {tax.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between font-bold text-lg border-t pt-2">

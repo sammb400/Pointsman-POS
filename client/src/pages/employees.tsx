@@ -1,21 +1,43 @@
+import { useState } from "react";
 import DashboardLayout from "@/components/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UserPlus, MoreHorizontal, Mail, Phone } from "lucide-react";
+import { usePOS } from "@/context/pos-context";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Employees() {
-  // todo: remove mock functionality - replace with real data from API
-  const employees = [
-    { id: 1, name: "Emily Johnson", email: "emily.j@store.com", phone: "(555) 123-4567", role: "Store Manager", status: "Active" },
-    { id: 2, name: "Michael Chen", email: "m.chen@store.com", phone: "(555) 234-5678", role: "Cashier", status: "Active" },
-    { id: 3, name: "Sarah Williams", email: "s.williams@store.com", phone: "(555) 345-6789", role: "Cashier", status: "Active" },
-    { id: 4, name: "David Rodriguez", email: "d.rodriguez@store.com", phone: "(555) 456-7890", role: "Stock Associate", status: "Active" },
-    { id: 5, name: "Jessica Brown", email: "j.brown@store.com", phone: "(555) 567-8901", role: "Cashier", status: "On Leave" },
-    { id: 6, name: "Christopher Lee", email: "c.lee@store.com", phone: "(555) 678-9012", role: "Assistant Manager", status: "Active" },
-    { id: 7, name: "Amanda Martinez", email: "a.martinez@store.com", phone: "(555) 789-0123", role: "Stock Associate", status: "Active" },
-    { id: 8, name: "James Wilson", email: "j.wilson@store.com", phone: "(555) 890-1234", role: "Cashier", status: "Inactive" },
-  ];
+  // Use real data from context
+  const { employees, addEmployee } = usePOS();
+  const { toast } = useToast();
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [newEmployee, setNewEmployee] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    role: "Cashier",
+    status: "Active"
+  });
+
+  const handleAddEmployee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await addEmployee(newEmployee);
+      setIsAddOpen(false);
+      setNewEmployee({ name: "", email: "", phone: "", role: "Cashier", status: "Active" });
+      toast({
+        title: "Employee Added",
+        description: `${newEmployee.name} has been added to the team.`,
+      });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to add employee.", variant: "destructive" });
+    }
+  };
 
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
@@ -49,10 +71,63 @@ export default function Employees() {
             <h1 className="text-3xl font-bold">Employees</h1>
             <p className="text-muted-foreground mt-1">Manage your team members and their roles.</p>
           </div>
-          <Button data-testid="button-add-employee">
-            <UserPlus className="h-4 w-4 mr-2" />
-            Add Employee
-          </Button>
+          
+          <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-add-employee">
+                <UserPlus className="h-4 w-4 mr-2" />
+                Add Employee
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Employee</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleAddEmployee} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Full Name</Label>
+                  <Input 
+                    id="name" 
+                    required 
+                    value={newEmployee.name}
+                    onChange={(e) => setNewEmployee({...newEmployee, name: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input 
+                    id="email" 
+                    type="email" 
+                    required 
+                    value={newEmployee.email}
+                    onChange={(e) => setNewEmployee({...newEmployee, email: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone</Label>
+                  <Input 
+                    id="phone" 
+                    required 
+                    value={newEmployee.phone}
+                    onChange={(e) => setNewEmployee({...newEmployee, phone: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="role">Role</Label>
+                  <Select value={newEmployee.role} onValueChange={(val) => setNewEmployee({...newEmployee, role: val})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Store Manager">Store Manager</SelectItem>
+                      <SelectItem value="Assistant Manager">Assistant Manager</SelectItem>
+                      <SelectItem value="Cashier">Cashier</SelectItem>
+                      <SelectItem value="Stock Associate">Stock Associate</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button type="submit" className="w-full">Save Employee</Button>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
 
         <Card>

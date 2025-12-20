@@ -1,24 +1,47 @@
+import { useState } from "react";
 import AdminLayout from "@/components/admin-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { DollarSign, TrendingUp, ShoppingBag, CreditCard, Banknote, BarChart3, PieChart } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DollarSign, TrendingUp, ShoppingBag, CreditCard, Banknote, BarChart3, PieChart, Calendar } from "lucide-react";
 import { usePOS } from "@/context/pos-context";
 
 export default function AdminFinancials() {
-  const { sales } = usePOS();
+  const { sales, settings } = usePOS();
+  const [timeRange, setTimeRange] = useState("all");
 
-  const totalRevenue = sales.reduce((sum, sale) => sum + sale.total, 0);
-  const totalTax = sales.reduce((sum, sale) => sum + sale.tax, 0);
-  const totalSalesCount = sales.length;
+  const filteredSales = sales.filter(sale => {
+    const saleDate = new Date(sale.date);
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    switch (timeRange) {
+      case "today":
+        return saleDate >= startOfDay;
+      case "week":
+        const startOfWeek = new Date(startOfDay);
+        startOfWeek.setDate(startOfDay.getDate() - startOfDay.getDay());
+        return saleDate >= startOfWeek;
+      case "month":
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        return saleDate >= startOfMonth;
+      default:
+        return true;
+    }
+  });
+
+  const totalRevenue = filteredSales.reduce((sum, sale) => sum + sale.total, 0);
+  const totalTax = filteredSales.reduce((sum, sale) => sum + sale.tax, 0);
+  const totalSalesCount = filteredSales.length;
   const avgTransactionValue = totalSalesCount > 0 ? totalRevenue / totalSalesCount : 0;
 
-  const cashRevenue = sales
+  const cashRevenue = filteredSales
     .filter(s => s.paymentType === "Cash")
     .reduce((sum, sale) => sum + sale.total, 0);
-  const cardRevenue = sales
+  const cardRevenue = filteredSales
     .filter(s => s.paymentType === "Card")
     .reduce((sum, sale) => sum + sale.total, 0);
 
-  const totalItemsSold = sales.reduce(
+  const totalItemsSold = filteredSales.reduce(
     (sum, sale) => sum + sale.items.reduce((itemSum, item) => itemSum + item.quantity, 0),
     0
   );
@@ -26,12 +49,29 @@ export default function AdminFinancials() {
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <DollarSign className="h-7 w-7 text-primary" />
-            Profit/Revenue Summary
-          </h1>
-          <p className="text-muted-foreground mt-1">Financial overview and business performance metrics.</p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <DollarSign className="h-7 w-7 text-primary" />
+              Profit/Revenue Summary
+            </h1>
+            <p className="text-muted-foreground mt-1">Financial overview and business performance metrics.</p>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <Select value={timeRange} onValueChange={setTimeRange}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select period" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="week">This Week</SelectItem>
+                <SelectItem value="month">This Month</SelectItem>
+                <SelectItem value="all">All Time</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Main Revenue Card */}
@@ -40,7 +80,7 @@ export default function AdminFinancials() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-lg text-muted-foreground mb-2">Total Revenue</p>
-                <p className="text-5xl font-bold text-primary">${totalRevenue.toFixed(2)}</p>
+                <p className="text-5xl font-bold text-primary">Kes {totalRevenue.toFixed(2)}</p>
                 <p className="text-sm text-muted-foreground mt-2">
                   From {totalSalesCount} completed transactions
                 </p>
@@ -75,7 +115,7 @@ export default function AdminFinancials() {
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">${avgTransactionValue.toFixed(2)}</div>
+              <div className="text-3xl font-bold">Kes {avgTransactionValue.toFixed(2)}</div>
               <p className="text-xs text-muted-foreground mt-1">Per transaction</p>
             </CardContent>
           </Card>
@@ -101,8 +141,8 @@ export default function AdminFinancials() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">${totalTax.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground mt-1">8% tax rate</p>
+              <div className="text-3xl font-bold">Kes {totalTax.toFixed(2)}</div>
+              <p className="text-xs text-muted-foreground mt-1">{settings.taxRate}% tax rate</p>
             </CardContent>
           </Card>
         </div>
@@ -118,7 +158,7 @@ export default function AdminFinancials() {
               <CardDescription>Revenue collected via cash payments</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold text-green-600">${cashRevenue.toFixed(2)}</div>
+              <div className="text-4xl font-bold text-green-600">Kes {cashRevenue.toFixed(2)}</div>
               <div className="mt-4 h-3 bg-muted rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-green-500 transition-all"
@@ -140,7 +180,7 @@ export default function AdminFinancials() {
               <CardDescription>Revenue collected via card payments</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold text-blue-600">${cardRevenue.toFixed(2)}</div>
+              <div className="text-4xl font-bold text-blue-600">Kes {cardRevenue.toFixed(2)}</div>
               <div className="mt-4 h-3 bg-muted rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-blue-500 transition-all"
