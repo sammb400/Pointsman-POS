@@ -104,7 +104,7 @@ export default function SalesHistory() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary">${totalRevenue.toFixed(2)}</div>
+              <div className="text-2xl font-bold text-primary">Kes{totalRevenue.toFixed(2)}</div>
               <p className="text-xs text-muted-foreground mt-1">From all transactions</p>
             </CardContent>
           </Card>
@@ -230,7 +230,7 @@ export default function SalesHistory() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-2xl font-bold text-primary">${group.dailyTotal.toFixed(2)}</p>
+                        <p className="text-2xl font-bold text-primary">Kes{group.dailyTotal.toFixed(2)}</p>
                         <p className="text-sm text-muted-foreground">Daily Total</p>
                       </div>
                     </div>
@@ -286,7 +286,7 @@ export default function SalesHistory() {
                                   </Badge>
                                 </td>
                                 <td className="py-4 px-4 text-right">
-                                  <span className="font-bold">${sale.total.toFixed(2)}</span>
+                                  <span className="font-bold">Kes{sale.total.toFixed(2)}</span>
                                 </td>
                               </tr>
                             ))}

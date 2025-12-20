@@ -53,8 +53,8 @@ export default function Shop() {
     if (sale) {
       toast({
         title: "Sale Complete!",
-        description: `Transaction ${sale.id} - $${sale.total.toFixed(2)} via ${paymentType}${
-          paymentType === "Cash" && sale.changeDue ? ` | Change: $${sale.changeDue.toFixed(2)}` : ""
+        description: `Transaction ${sale.id} - Kes ${sale.total.toFixed(2)} via ${paymentType}${
+          paymentType === "Cash" && sale.changeDue ? ` | Change: Kes ${sale.changeDue.toFixed(2)}` : ""
         }`,
       });
       setAmountTendered("");
@@ -141,7 +141,7 @@ export default function Shop() {
                       )}
                     </div>
                     <h3 className="font-medium text-sm truncate">{product.name}</h3>
-                    <p className="text-primary font-bold">${product.price.toFixed(2)}</p>
+                    <p className="text-primary font-bold">Kes {product.price.toFixed(2)}</p>
                     <Badge 
                       variant={product.stock <= 5 ? "destructive" : "outline"} 
                       className="mt-1 text-xs"
@@ -202,7 +202,7 @@ export default function Shop() {
                             <div className="flex-1 min-w-0">
                               <p className="font-medium text-sm truncate">{item.name}</p>
                               <p className="text-xs text-muted-foreground">
-                                ${item.price.toFixed(2)} x {item.quantity} = ${(item.price * item.quantity).toFixed(2)}
+                                Kes {item.price.toFixed(2)} x {item.quantity} = Kes {(item.price * item.quantity).toFixed(2)}
                               </p>
                             </div>
                             <div className="flex items-center gap-1">
@@ -244,15 +244,15 @@ export default function Shop() {
                     <div className="border-t pt-4 space-y-2">
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Subtotal</span>
-                        <span>${subtotal.toFixed(2)}</span>
+                        <span>Kes {subtotal.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Tax (8%)</span>
-                        <span>${tax.toFixed(2)}</span>
+                        <span>Kes {tax.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between font-bold text-lg border-t pt-2">
                         <span>Total</span>
-                        <span className="text-primary">${total.toFixed(2)}</span>
+                        <span className="text-primary">Kes {total.toFixed(2)}</span>
                       </div>
                     </div>
 
@@ -277,15 +277,15 @@ export default function Shop() {
                         <div className="text-sm space-y-1">
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Items ({cart.reduce((sum, item) => sum + item.quantity, 0)})</span>
-                            <span>${subtotal.toFixed(2)}</span>
+                            <span>Kes {subtotal.toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Tax</span>
-                            <span>${tax.toFixed(2)}</span>
+                            <span>Kes {tax.toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between font-bold pt-1 border-t">
                             <span>Total</span>
-                            <span className="text-primary">${total.toFixed(2)}</span>
+                            <span className="text-primary">Kes {total.toFixed(2)}</span>
                           </div>
                         </div>
                       </div>
@@ -320,7 +320,7 @@ export default function Shop() {
                         <div className="space-y-2">
                           <Label htmlFor="amountTendered">Amount Tendered</Label>
                           <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">Kes</span>
                             <Input
                               id="amountTendered"
                               type="number"
@@ -329,7 +329,7 @@ export default function Shop() {
                               placeholder="0.00"
                               value={amountTendered}
                               onChange={(e) => setAmountTendered(e.target.value)}
-                              className="pl-7 h-12 text-lg"
+                              className="pl-12 h-12 text-lg"
                               data-testid="input-amount-tendered"
                             />
                           </div>
@@ -344,7 +344,7 @@ export default function Shop() {
                                 onClick={() => setAmountTendered(amount.toString())}
                                 data-testid={`button-quick-amount-${amount}`}
                               >
-                                ${amount}
+                                Kes {amount}
                               </Button>
                             ))}
                           </div>
@@ -354,13 +354,13 @@ export default function Shop() {
                             <div className="flex items-center justify-between">
                               <span className="font-medium">Change Due:</span>
                               <span className={`text-xl font-bold ${changeDue >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                                ${Math.max(0, changeDue).toFixed(2)}
+                                Kes {Math.max(0, changeDue).toFixed(2)}
                               </span>
                             </div>
                             {changeDue < 0 && (
                               <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400 mt-1">
                                 <AlertCircle className="h-3 w-3" />
-                                <span>Amount insufficient by ${Math.abs(changeDue).toFixed(2)}</span>
+                                <span>Amount insufficient by Kes {Math.abs(changeDue).toFixed(2)}</span>
                               </div>
                             )}
                           </div>
@@ -387,7 +387,7 @@ export default function Shop() {
                         data-testid="button-finalize-sale"
                       >
                         <CheckCircle2 className="h-5 w-5 mr-2" />
-                        Finalize Sale - ${total.toFixed(2)}
+                        Finalize Sale - Kes {total.toFixed(2)}
                       </Button>
                     </div>
                   </>

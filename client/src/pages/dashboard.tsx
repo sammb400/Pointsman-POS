@@ -14,7 +14,7 @@ export default function Dashboard() {
   const stats = [
     {
       title: "Total Revenue",
-      value: `$${totalRevenue.toFixed(2)}`,
+      value: `Kes ${totalRevenue.toFixed(2)}`,
       change: `${totalOrders} sales`,
       icon: DollarSign,
     },
@@ -32,7 +32,7 @@ export default function Dashboard() {
     },
     {
       title: "Avg. Order Value",
-      value: `$${avgOrderValue.toFixed(2)}`,
+      value: `Kes ${avgOrderValue.toFixed(2)}`,
       change: "Per transaction",
       icon: TrendingUp,
     },
@@ -43,7 +43,7 @@ export default function Dashboard() {
     id: sale.id.replace("SALE-", "#"),
     customer: "Walk-in",
     items: sale.items.reduce((sum, item) => sum + item.quantity, 0),
-    total: `$${sale.total.toFixed(2)}`,
+    total: `Kes ${sale.total.toFixed(2)}`,
     status: "Completed",
     paymentType: sale.paymentType,
   }));

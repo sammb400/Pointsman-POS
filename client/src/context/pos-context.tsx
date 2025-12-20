@@ -33,6 +33,18 @@ export interface Sale {
   soldByEmail: string;
 }
 
+export interface DashboardSummary {
+  today: {
+    revenue: number;
+    transactions: number;
+  };
+  week: {
+    revenue: number;
+    transactions: number;
+  };
+  lowStockItems: Product[];
+}
+
 interface POSContextType {
   products: Product[];
   cart: CartItem[];
@@ -45,6 +57,7 @@ interface POSContextType {
   clearCart: () => void;
   finalizeSale: (cart: CartItem[], paymentType: "Cash" | "Card", amountTendered?: number) => Promise<Sale | null>;
   getCartTotals: () => { subtotal: number; tax: number; total: number };
+  getDashboardSummary: () => DashboardSummary;
 }
 
 const POSContext = createContext<POSContextType | undefined>(undefined);
@@ -235,6 +248,40 @@ export function POSProvider({ children }: { children: ReactNode }) {
     return sale;
   };
 
+  const getDashboardSummary = useMemo(() => {
+    return (): DashboardSummary => {
+      const now = new Date();
+      const todayStart = new Date(now.setHours(0, 0, 0, 0));
+      const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
+      weekStart.setHours(0, 0, 0, 0);
+
+      const todaySales = sales.filter(s => new Date(s.date) >= todayStart);
+      const weekSales = sales.filter(s => new Date(s.date) >= weekStart);
+
+      const todaySummary = todaySales.reduce((acc, sale) => {
+        acc.revenue += sale.total;
+        acc.transactions += 1;
+        return acc;
+      }, { revenue: 0, transactions: 0 });
+
+      const weekSummary = weekSales.reduce((acc, sale) => {
+        acc.revenue += sale.total;
+        acc.transactions += 1;
+        return acc;
+      }, { revenue: 0, transactions: 0 });
+
+      const lowStockItems = products
+        .filter(p => p.stock > 0 && p.stock <= 5)
+        .sort((a, b) => a.stock - b.stock);
+
+      return {
+        today: todaySummary,
+        week: weekSummary,
+        lowStockItems,
+      };
+    }
+  }, [sales, products]);
+
   return (
     <POSContext.Provider
       value={{
@@ -249,6 +296,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         clearCart,
         finalizeSale,
         getCartTotals,
+        getDashboardSummary,
       }}
     >
       {children}

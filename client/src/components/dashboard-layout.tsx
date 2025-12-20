@@ -25,7 +25,7 @@ const navItems = [
   { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { path: "/dashboard/shop", label: "Shop / POS", icon: ShoppingCart },
   { path: "/dashboard/sales", label: "Sales History", icon: BarChart3 },
-  { path: "/dashboard/employees", label: "Employees", icon: Users },
+  // { path: "/dashboard/employees", label: "Employees", icon: Users },
   { path: "/dashboard/products/add", label: "Add Products", icon: PlusCircle },
   { path: "/dashboard/admin", label: "Admin Portal", icon: Shield, isAdmin: true },
 ];
