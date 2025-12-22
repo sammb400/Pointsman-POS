@@ -13,6 +13,7 @@ export interface Product {
   description?: string;
   addedByUid: string;
   addedByEmail: string;
+  barcode?: string;
 }
 
 export interface CartItem extends Product {
@@ -75,6 +76,7 @@ interface POSContextType {
   addToCart: (product: Product) => void;
   employees: Employee[];
   addEmployee: (employee: Omit<Employee, "id">) => Promise<void>;
+  scanBarcode: (barcode: string) => boolean;
   updateCartQuantity: (productId: string, change: number) => void;
   removeFromCart: (productId: string) => void;
   clearCart: () => void;
@@ -258,6 +260,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
     await addDoc(employeesCollection, employeeData);
   };
 
+  const scanBarcode = (barcode: string) => {
+    const scannedProduct = products.find(p => p.barcode === barcode);
+    if (scannedProduct) {
+      addToCart(scannedProduct);
+      return true;
+    }
+    return false;
+  };
+
   const addToCart = (product: Product) => {
     if (product.stock <= 0) return;
     
@@ -414,6 +425,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         settings,
         updateSettings,
         addEmployee,
+        scanBarcode,
         addProduct,
         updateProductStock,
         addToCart,

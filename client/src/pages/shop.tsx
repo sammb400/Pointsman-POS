@@ -1,23 +1,62 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import DashboardLayout from "@/components/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Minus, Trash2, CreditCard, Banknote, X, CheckCircle2, AlertCircle } from "lucide-react";
+import { Search, Plus, Minus, Trash2, CreditCard, Banknote, X, CheckCircle2, AlertCircle, Camera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePOS } from "@/context/pos-context";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useZxing } from "react-zxing";
 
 export default function Shop() {
   const { toast } = useToast();
-  const { products, cart, addToCart, updateCartQuantity, removeFromCart, clearCart, finalizeSale, getCartTotals, settings } = usePOS();
+  const { products, cart, addToCart, updateCartQuantity, removeFromCart, clearCart, finalizeSale, getCartTotals, settings, scanBarcode } = usePOS();
   
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [paymentType, setPaymentType] = useState<"Cash" | "Card">("Cash");
   const [amountTendered, setAmountTendered] = useState("");
   const [showCheckout, setShowCheckout] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  
+  // Barcode Scanner Logic
+  const barcodeBuffer = useRef("");
+  const lastKeyTime = useRef(0);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore input if the user is typing in a search box or input field
+      if ((e.target as HTMLElement).tagName === "INPUT") return;
+
+      const currentTime = Date.now();
+      // If more than 2 seconds have passed since the last keypress, reset buffer
+      // This prevents accidental stray keys from ruining a scan
+      if (currentTime - lastKeyTime.current > 2000) {
+        barcodeBuffer.current = "";
+      }
+      lastKeyTime.current = currentTime;
+
+      if (e.key === "Enter") {
+        if (barcodeBuffer.current) {
+          const success = scanBarcode(barcodeBuffer.current);
+          if (success) {
+            toast({ title: "Item Scanned", description: `Added product to cart.` });
+          } else {
+            toast({ title: "Not Found", description: `No product found with barcode: ${barcodeBuffer.current}`, variant: "destructive" });
+          }
+          barcodeBuffer.current = ""; // Clear buffer
+        }
+      } else if (e.key.length === 1) {
+        barcodeBuffer.current += e.key;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [scanBarcode, toast]);
 
   const categories = ["All", ...Array.from(new Set(products.map(p => p.category)))];
 
@@ -105,6 +144,14 @@ export default function Shop() {
                   data-testid="input-search-products"
                 />
               </div>
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={() => setIsScannerOpen(true)}
+                title="Scan Barcode with Camera"
+              >
+                <Camera className="h-4 w-4" />
+              </Button>
               <div className="flex gap-2 flex-wrap">
                 {categories.map(category => (
                   <Button
@@ -397,6 +444,54 @@ export default function Shop() {
           </div>
         </div>
       </div>
+
+      <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Scan Product Barcode</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-center p-4">
+            {isScannerOpen && (
+              <BarcodeScanner 
+                onScan={(barcode) => {
+                  const success = scanBarcode(barcode);
+                  if (success) {
+                    toast({ title: "Item Scanned", description: "Product added to cart." });
+                    setIsScannerOpen(false); // Close on success
+                  } else {
+                    toast({ title: "Not Found", description: `Unknown barcode: ${barcode}`, variant: "destructive" });
+                  }
+                }} 
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
+  );
+}
+
+function BarcodeScanner({ onScan }: { onScan: (data: string) => void }) {
+  const [lastScan, setLastScan] = useState("");
+  const [lastTime, setLastTime] = useState(0);
+
+  const { ref } = useZxing({
+    onResult(result) {
+      const text = result.getText();
+      const now = Date.now();
+      // Prevent duplicate scans of the same code within 2 seconds
+      if (text === lastScan && now - lastTime < 2000) return;
+      
+      setLastScan(text);
+      setLastTime(now);
+      onScan(text);
+    },
+  });
+
+  return (
+    <div className="relative w-full aspect-square max-w-sm overflow-hidden rounded-lg bg-black">
+      <video ref={ref} className="w-full h-full object-cover" />
+      <div className="absolute inset-0 border-2 border-primary/50 m-12 rounded-lg pointer-events-none animate-pulse" />
+    </div>
   );
 }
