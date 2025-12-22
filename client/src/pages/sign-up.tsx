@@ -19,6 +19,7 @@ export default function SignUp() {
     accessCode: "",
   });
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [isEmployee, setIsEmployee] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const { signup } = useAuth();
@@ -30,7 +31,7 @@ export default function SignUp() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.accessCode !== "007") {
+    if (!isEmployee && formData.accessCode !== "007") {
       toast({
         title: "Invalid Access Code",
         description: "The provided access code is incorrect.",
@@ -61,7 +62,7 @@ export default function SignUp() {
       await signup({
         email: formData.email,
         password: formData.password,
-        businessName: formData.businessName,
+        businessName: isEmployee ? "" : formData.businessName,
         phoneNumber: formData.phone,
       });
       toast({
@@ -99,32 +100,48 @@ export default function SignUp() {
           </CardHeader>
           <CardContent className="space-y-6">
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="businessName">Business Name</Label>
-                <Input
-                  id="businessName"
-                  type="text"
-                  placeholder="Your Business"
-                  value={formData.businessName}
-                  onChange={handleChange("businessName")}
-                  required
-                  data-testid="input-business-name"
-                  className="h-12"
+              <div className="flex items-center space-x-2 bg-muted/50 p-3 rounded-md border">
+                <Checkbox
+                  id="isEmployee"
+                  checked={isEmployee}
+                  onCheckedChange={(checked) => setIsEmployee(checked === true)}
                 />
+                <Label htmlFor="isEmployee" className="cursor-pointer font-medium">
+                  I am joining an existing team (Employee)
+                </Label>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="accessCode">Access Code</Label>
-                <Input
-                  id="accessCode"
-                  type="password"
-                  placeholder="Enter access code"
-                  value={formData.accessCode}
-                  onChange={handleChange("accessCode")}
-                  required
-                  data-testid="input-access-code"
-                  className="h-12"
-                />
-              </div>
+
+              {!isEmployee && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="businessName">Business Name</Label>
+                    <Input
+                      id="businessName"
+                      type="text"
+                      placeholder="Your Business"
+                      value={formData.businessName}
+                      onChange={handleChange("businessName")}
+                      required={!isEmployee}
+                      data-testid="input-business-name"
+                      className="h-12"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="accessCode">Access Code</Label>
+                    <Input
+                      id="accessCode"
+                      type="password"
+                      placeholder="Enter access code"
+                      value={formData.accessCode}
+                      onChange={handleChange("accessCode")}
+                      required={!isEmployee}
+                      data-testid="input-access-code"
+                      className="h-12"
+                    />
+                  </div>
+                </>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input

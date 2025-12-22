@@ -133,13 +133,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
         const businessDocSnap = await getDoc(businessDocRef);
         
         if (businessDocSnap.exists()) {
-          setBusinessId(currentUser.uid);
-          return;
+          // Only treat as owner if the document has a valid business name.
+          // Employees created via signup will have an empty businessName.
+          const data = businessDocSnap.data();
+          if (data.businessName) {
+            setBusinessId(currentUser.uid);
+            return;
+          }
         }
 
         // 2. Check if the current user is an employee
         if (currentUser.email) {
-          const q = query(collectionGroup(db, "employees"), where("email", "==", currentUser.email));
+          const q = query(collectionGroup(db, "employees"), where("email", "==", currentUser.email.toLowerCase()));
           const querySnapshot = await getDocs(q);
           
           if (!querySnapshot.empty) {
@@ -231,7 +236,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       addedByUid: currentUser.uid,
       addedByEmail: currentUser.email || "Unknown", // Fallback if email is not available
     };
-    const productsCollection = collection(db, "businesses", businessId, "products");
+    const productsCollection = collection(db, "stockedPointsman");
     await addDoc(productsCollection, productData);
   };
 
@@ -244,7 +249,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const addEmployee = async (employee: Omit<Employee, "id">) => {
     if (!currentUser || !businessId) throw new Error("No user logged in to add employee.");
     const employeesCollection = collection(db, "businesses", businessId, "employees");
-    await addDoc(employeesCollection, employee);
+    
+    // Normalize email to lowercase to ensure matching works when the user signs up via Firebase Auth
+    const employeeData = {
+      ...employee,
+      email: employee.email.toLowerCase().trim(),
+    };
+    await addDoc(employeesCollection, employeeData);
   };
 
   const addToCart = (product: Product) => {
