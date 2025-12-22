@@ -472,25 +472,25 @@ export default function Shop() {
 }
 
 function BarcodeScanner({ onScan }: { onScan: (data: string) => void }) {
-  const [lastScan, setLastScan] = useState("");
-  const [lastTime, setLastTime] = useState(0);
+  const lastScan = useRef("");
+  const lastTime = useRef(0);
 
   const { ref } = useZxing({
-    onResult(result) {
+    onDecodeResult(result: any) {
       const text = result.getText();
       const now = Date.now();
       // Prevent duplicate scans of the same code within 2 seconds
-      if (text === lastScan && now - lastTime < 2000) return;
+      if (text === lastScan.current && now - lastTime.current < 2000) return;
       
-      setLastScan(text);
-      setLastTime(now);
+      lastScan.current = text;
+      lastTime.current = now;
       onScan(text);
     },
   });
 
   return (
     <div className="relative w-full aspect-square max-w-sm overflow-hidden rounded-lg bg-black">
-      <video ref={ref} className="w-full h-full object-cover" />
+      <video ref={ref as any} className="w-full h-full object-cover" />
       <div className="absolute inset-0 border-2 border-primary/50 m-12 rounded-lg pointer-events-none animate-pulse" />
     </div>
   );
