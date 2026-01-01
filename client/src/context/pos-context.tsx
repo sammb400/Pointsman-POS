@@ -27,7 +27,7 @@ export interface Sale {
   subtotal: number;
   tax: number;
   total: number;
-  paymentType: "Cash" | "Card";
+  paymentType: "Cash" | "M-Pesa";
   amountTendered?: number;
   changeDue?: number;
   soldByUid: string;
@@ -81,7 +81,7 @@ interface POSContextType {
   updateCartQuantity: (productId: string, change: number) => void;
   removeFromCart: (productId: string) => void;
   clearCart: () => void;
-  finalizeSale: (cart: CartItem[], paymentType: "Cash" | "Card", amountTendered?: number) => Promise<Sale | null>;
+  finalizeSale: (cart: CartItem[], paymentType: "Cash" | "M-Pesa", amountTendered?: number) => Promise<Sale | null>;
   getCartTotals: () => { subtotal: number; tax: number; total: number };
   getDashboardSummary: () => DashboardSummary;
 }
@@ -349,7 +349,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [cart, settings.taxRate]);
 
-  const finalizeSale = async (cart: CartItem[], paymentType: "Cash" | "Card", amountTendered?: number): Promise<Sale | null> => {
+  const finalizeSale = async (cart: CartItem[], paymentType: "Cash" | "M-Pesa", amountTendered?: number): Promise<Sale | null> => {
     if (cart.length === 0) return null;
     if (!currentUser || !businessId) throw new Error("User must be logged in to finalize a sale.");
   

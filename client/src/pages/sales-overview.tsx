@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import DashboardLayout from "@/components/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Calendar, Search, CreditCard, Banknote } from "lucide-react";
+import { Calendar, Search, Smartphone, Banknote } from "lucide-react";
 import { usePOS } from "@/context/pos-context";
 
 export default function SalesOverview() {
@@ -83,7 +83,7 @@ export default function SalesOverview() {
                                     ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
                                     : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
                                 }`}>
-                                  {sale.paymentType === 'Cash' ? <Banknote className="h-3 w-3" /> : <CreditCard className="h-3 w-3" />}
+                                  {sale.paymentType === 'Cash' ? <Banknote className="h-3 w-3" /> : <Smartphone className="h-3 w-3" />}
                                   {sale.paymentType}
                                 </span>
                                 <span className="font-bold w-24 text-right">Kes {sale.total.toLocaleString()}</span>

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import DashboardLayout from "@/components/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, ShoppingBag, Package, TrendingUp, ArrowUpRight, Calendar, CreditCard, Banknote } from "lucide-react";
+import { DollarSign, ShoppingBag, Package, TrendingUp, ArrowUpRight, Calendar, Smartphone, Banknote } from "lucide-react";
 import { usePOS } from "@/context/pos-context";
 
 export default function Dashboard() {
@@ -53,10 +53,10 @@ export default function Dashboard() {
 
   // 3. Payment Split
   const paymentSplit = useMemo(() => {
-    const split = { Cash: 0, Card: 0 };
+    const split = { Cash: 0, "M-Pesa": 0 };
     sales.forEach(s => {
       if (s.paymentType === "Cash") split.Cash += s.total;
-      else if (s.paymentType === "Card") split.Card += s.total;
+      else if (s.paymentType === "M-Pesa") split["M-Pesa"] += s.total;
     });
     return split;
   }, [sales]);
@@ -179,11 +179,11 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full">
-                      <CreditCard className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <Smartphone className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                     </div>
-                    <span className="font-medium">Card</span>
+                    <span className="font-medium">M-Pesa</span>
                   </div>
-                  <span className="font-bold">Kes {paymentSplit.Card.toLocaleString()}</span>
+                  <span className="font-bold">Kes {paymentSplit["M-Pesa"].toLocaleString()}</span>
                 </div>
               </CardContent>
             </Card>

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Minus, Trash2, CreditCard, Banknote, X, CheckCircle2, AlertCircle, Camera } from "lucide-react";
+import { Search, Plus, Minus, Trash2, Smartphone, Banknote, X, CheckCircle2, AlertCircle, Camera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePOS } from "@/context/pos-context";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -17,7 +17,7 @@ export default function Shop() {
   
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const [paymentType, setPaymentType] = useState<"Cash" | "Card">("Cash");
+  const [paymentType, setPaymentType] = useState<"Cash" | "M-Pesa">("Cash");
   const [amountTendered, setAmountTendered] = useState("");
   const [showCheckout, setShowCheckout] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -69,7 +69,7 @@ export default function Shop() {
   const { subtotal, tax, total } = getCartTotals();
   const tenderedAmount = parseFloat(amountTendered) || 0;
   const changeDue = paymentType === "Cash" ? tenderedAmount - total : 0;
-  const canFinalize = cart.length > 0 && (paymentType === "Card" || tenderedAmount >= total);
+  const canFinalize = cart.length > 0 && (paymentType === "M-Pesa" || tenderedAmount >= total);
 
   const handleFinalizeSale = async () => {
     if (!canFinalize) {
@@ -351,13 +351,13 @@ export default function Shop() {
                             Cash
                           </Button>
                           <Button
-                            variant={paymentType === "Card" ? "default" : "outline"}
+                            variant={paymentType === "M-Pesa" ? "default" : "outline"}
                             className="h-12"
-                            onClick={() => setPaymentType("Card")}
-                            data-testid="button-payment-card"
+                            onClick={() => setPaymentType("M-Pesa")}
+                            data-testid="button-payment-mpesa"
                           >
-                            <CreditCard className="h-4 w-4 mr-2" />
-                            Card
+                            <Smartphone className="h-4 w-4 mr-2" />
+                            M-Pesa
                           </Button>
                         </div>
                       </div>
@@ -414,13 +414,13 @@ export default function Shop() {
                         </div>
                       )}
 
-                      {/* Card Payment Message */}
-                      {paymentType === "Card" && (
+                      {/* M-Pesa Payment Message */}
+                      {paymentType === "M-Pesa" && (
                         <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-md">
                           <div className="flex items-center gap-2">
-                            <CreditCard className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            <Smartphone className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                             <span className="text-sm text-blue-600 dark:text-blue-400">
-                              Card payment will be processed
+                              M-Pesa payment will be processed
                             </span>
                           </div>
                         </div>
