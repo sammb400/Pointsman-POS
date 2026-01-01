@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { 
   Shield,
@@ -6,7 +7,8 @@ import {
   DollarSign,
   Settings,
   ArrowLeft,
-  LayoutDashboard
+  LayoutDashboard,
+  Menu
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -24,33 +26,60 @@ const adminNavItems = [
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const [location] = useLocation();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-background">
       {/* Admin Header Banner */}
-      <div className="bg-primary text-primary-foreground">
+      <div className="bg-primary text-primary-foreground sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="md:hidden text-primary-foreground hover:bg-primary-foreground/20 -ml-2"
+                onClick={() => setMobileOpen(!mobileOpen)}
+              >
+                <Menu className="h-6 w-6" />
+              </Button>
               <Shield className="h-6 w-6" />
               <div>
                 <h1 className="font-bold text-lg">Admin Portal</h1>
-                <p className="text-xs opacity-80">Restricted Access Area</p>
+                <p className="text-xs opacity-80 hidden sm:block">Restricted Access Area</p>
               </div>
             </div>
             <Link href="/dashboard">
-              <Button variant="secondary" size="sm" data-testid="button-back-dashboard">
+              <Button variant="secondary" size="sm" className="hidden sm:flex" data-testid="button-back-dashboard">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Dashboard
+              </Button>
+              <Button variant="secondary" size="icon" className="sm:hidden" title="Back to Dashboard">
+                 <ArrowLeft className="h-4 w-4" />
               </Button>
             </Link>
           </div>
         </div>
       </div>
 
-      <div className="flex">
+      <div className="flex relative">
+        {/* Mobile Overlay */}
+        {mobileOpen && (
+          <div 
+            className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            onClick={() => setMobileOpen(false)}
+          />
+        )}
+
         {/* Admin Sidebar */}
-        <aside className="w-64 min-h-[calc(100vh-64px)] bg-card border-r hidden md:block">
+        <aside className={`
+          w-64 bg-card border-r 
+          fixed md:static inset-y-0 left-0 z-50
+          transform transition-transform duration-300 ease-in-out
+          ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
+          md:translate-x-0
+          h-full md:min-h-[calc(100vh-64px)]
+        `}>
           <nav className="p-4 space-y-1">
             {adminNavItems.map((item) => {
               const isActive = location === item.path;
@@ -62,6 +91,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                       hover-elevate cursor-pointer
                       ${isActive ? "bg-primary text-primary-foreground" : ""}
                     `}
+                    onClick={() => setMobileOpen(false)}
                     data-testid={`admin-nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                   >
                     <item.icon className="h-5 w-5 flex-shrink-0" />
@@ -82,29 +112,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </nav>
         </aside>
 
-        {/* Mobile Navigation */}
-        <div className="md:hidden p-4 border-b w-full overflow-x-auto">
-          <div className="flex gap-2">
-            {adminNavItems.map((item) => {
-              const isActive = location === item.path;
-              return (
-                <Link key={item.path} href={item.path}>
-                  <Button
-                    variant={isActive ? "default" : "outline"}
-                    size="sm"
-                    className="whitespace-nowrap"
-                  >
-                    <item.icon className="h-4 w-4 mr-1" />
-                    {item.label}
-                  </Button>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-
         {/* Main Content */}
-        <main className="flex-1 p-4 md:p-6 lg:p-8">
+        <main className="flex-1 p-4 md:p-6 lg:p-8 w-full">
           {children}
         </main>
       </div>

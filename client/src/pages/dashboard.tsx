@@ -140,7 +140,7 @@ export default function Dashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[200px] w-full flex items-end justify-between gap-2 mt-4">
+              <div className="h-[200px] w-full flex items-end justify-between gap-1 sm:gap-2 mt-4">
                 {salesByDate.map((day) => (
                   <div key={day.date} className="flex flex-col items-center gap-2 flex-1 group">
                     <div className="relative w-full flex items-end justify-center h-full">
@@ -153,7 +153,7 @@ export default function Dashboard() {
                         </div>
                       </div>
                     </div>
-                    <span className="text-xs text-muted-foreground font-medium">{day.dayName}</span>
+                    <span className="text-[10px] sm:text-xs text-muted-foreground font-medium">{day.dayName}</span>
                   </div>
                 ))}
               </div>
@@ -214,7 +214,7 @@ export default function Dashboard() {
 
         <div className="grid lg:grid-cols-2 gap-6">
           {/* Recent Orders */}
-          <Card>
+          <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Recent Orders</CardTitle>
             </CardHeader>
@@ -226,7 +226,7 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full whitespace-nowrap">
                     <thead>
                       <tr className="border-b">
                         <th className="text-left py-3 px-2 font-medium text-muted-foreground text-sm">Order ID</th>
@@ -238,7 +238,7 @@ export default function Dashboard() {
                     <tbody>
                       {recentOrders.map((order) => (
                         <tr key={order.id} className="border-b last:border-0 hover-elevate">
-                          <td className="py-3 px-2 font-medium text-sm" data-testid={`order-id-${order.id}`}>{order.id}</td>
+                          <td className="py-3 px-2 font-medium text-sm truncate max-w-[100px]" title={order.id} data-testid={`order-id-${order.id}`}>{order.id}</td>
                           <td className="py-3 px-2 text-muted-foreground text-sm">{order.items}</td>
                           <td className="py-3 px-2 font-medium text-sm">{order.total}</td>
                           <td className="py-3 px-2">
@@ -256,7 +256,7 @@ export default function Dashboard() {
           </Card>
 
           {/* Low Stock Alert */}
-          <Card>
+          <Card className="min-w-0">
             <CardHeader>
               <CardTitle>Low Stock Alert</CardTitle>
             </CardHeader>
@@ -274,9 +274,9 @@ export default function Dashboard() {
                       className="flex items-center justify-between p-3 bg-muted/50 rounded-md"
                       data-testid={`low-stock-${product.id}`}
                     >
-                      <div>
-                        <p className="font-medium">{product.name}</p>
-                        <p className="text-xs text-muted-foreground">{product.category}</p>
+                      <div className="min-w-0 flex-1 mr-2">
+                        <p className="font-medium truncate">{product.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{product.category}</p>
                       </div>
                       <div className="text-right">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${

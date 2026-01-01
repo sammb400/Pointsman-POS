@@ -71,14 +71,14 @@ export default function SalesOverview() {
                         <div className="space-y-2">
                           {daySales.map(sale => (
                             <div key={sale.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors text-sm border">
-                              <div className="flex flex-col gap-1">
-                                <span className="font-medium">{sale.id.replace("SALE-", "#")}</span>
+                              <div className="flex flex-col gap-1 min-w-0 mr-2">
+                                <span className="font-medium truncate" title={sale.id.replace("SALE-", "#")}>{sale.id.replace("SALE-", "#")}</span>
                                 <span className="text-xs text-muted-foreground">
                                   {new Date(sale.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {sale.items.length} items
                                 </span>
                               </div>
-                              <div className="flex items-center gap-4">
-                                <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
+                              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1 sm:gap-4 flex-shrink-0">
+                                <span className={`px-2 py-1 rounded-full text-[10px] sm:text-xs font-medium flex items-center gap-1 ${
                                   sale.paymentType === 'Cash' 
                                     ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
                                     : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
@@ -86,7 +86,7 @@ export default function SalesOverview() {
                                   {sale.paymentType === 'Cash' ? <Banknote className="h-3 w-3" /> : <Smartphone className="h-3 w-3" />}
                                   {sale.paymentType}
                                 </span>
-                                <span className="font-bold w-24 text-right">Kes {sale.total.toLocaleString()}</span>
+                                <span className="font-bold sm:w-24 text-right">Kes {sale.total.toLocaleString()}</span>
                               </div>
                             </div>
                           ))}
