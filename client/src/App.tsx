@@ -11,7 +11,7 @@ import SignUp from "@/pages/sign-up";
 import Dashboard from "@/pages/dashboard";
 import Employees from "@/pages/employees";
 import Shop from "@/pages/shop";
-import SalesHistory from "@/pages/sales-history";
+import SalesOverview from "@/pages/sales-overview";
 import AddProduct from "@/pages/add-product";
 import RestockProduct from "@/pages/restock-product";
 import AdminPortal from "@/pages/admin/index";
@@ -30,7 +30,7 @@ function Router() {
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/dashboard/employees" component={Employees} />
       <Route path="/dashboard/shop" component={Shop} />
-      <Route path="/dashboard/sales" component={SalesHistory} />
+      <Route path="/dashboard/sales" component={SalesOverview} />
       <Route path="/dashboard/products/add" component={AddProduct} />
       <Route path="/dashboard/products/restock" component={RestockProduct} />
       <Route path="/dashboard/admin" component={AdminPortal} />

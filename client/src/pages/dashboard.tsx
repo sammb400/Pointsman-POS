@@ -1,6 +1,7 @@
+import { useMemo } from "react";
 import DashboardLayout from "@/components/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, ShoppingBag, Package, TrendingUp, ArrowUpRight } from "lucide-react";
+import { DollarSign, ShoppingBag, Package, TrendingUp, ArrowUpRight, Calendar, CreditCard, Banknote } from "lucide-react";
 import { usePOS } from "@/context/pos-context";
 
 export default function Dashboard() {
@@ -10,6 +11,55 @@ export default function Dashboard() {
   const totalOrders = sales.length;
   const totalProducts = products.length;
   const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+  // 1. Sales by Date (Last 7 Days)
+  const salesByDate = useMemo(() => {
+    const days = [];
+    const today = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+      
+      const daySales = sales.filter(s => s.date.startsWith(dateStr));
+      const revenue = daySales.reduce((sum, s) => sum + s.total, 0);
+      
+      days.push({ date: dateStr, dayName, revenue, count: daySales.length });
+    }
+    return days;
+  }, [sales]);
+
+  const maxDailyRevenue = Math.max(...salesByDate.map(d => d.revenue), 100);
+
+  // 2. Top Selling Products
+  const topProducts = useMemo(() => {
+    const productStats: Record<string, { name: string; quantity: number; revenue: number }> = {};
+    
+    sales.forEach(sale => {
+      sale.items.forEach(item => {
+        if (!productStats[item.id]) {
+          productStats[item.id] = { name: item.name, quantity: 0, revenue: 0 };
+        }
+        productStats[item.id].quantity += item.quantity;
+        productStats[item.id].revenue += (item.price * item.quantity);
+      });
+    });
+
+    return Object.values(productStats)
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 5);
+  }, [sales]);
+
+  // 3. Payment Split
+  const paymentSplit = useMemo(() => {
+    const split = { Cash: 0, Card: 0 };
+    sales.forEach(s => {
+      if (s.paymentType === "Cash") split.Cash += s.total;
+      else if (s.paymentType === "Card") split.Card += s.total;
+    });
+    return split;
+  }, [sales]);
 
   const stats = [
     {
@@ -78,6 +128,88 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           ))}
+        </div>
+
+        {/* Sales Chart & Insights Section */}
+        <div className="grid lg:grid-cols-3 gap-6">
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-muted-foreground" />
+                Sales Overview (Last 7 Days)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[200px] w-full flex items-end justify-between gap-2 mt-4">
+                {salesByDate.map((day) => (
+                  <div key={day.date} className="flex flex-col items-center gap-2 flex-1 group">
+                    <div className="relative w-full flex items-end justify-center h-full">
+                      <div 
+                        className="w-full max-w-[40px] bg-primary/80 rounded-t-md transition-all group-hover:bg-primary relative"
+                        style={{ height: `${(day.revenue / maxDailyRevenue) * 100}%` }}
+                      >
+                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-popover text-popover-foreground text-xs px-2 py-1 rounded shadow opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 border">
+                          Kes {day.revenue.toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-xs text-muted-foreground font-medium">{day.dayName}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="space-y-6">
+            {/* Payment Methods */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Payment Methods</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-full">
+                      <Banknote className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    </div>
+                    <span className="font-medium">Cash</span>
+                  </div>
+                  <span className="font-bold">Kes {paymentSplit.Cash.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+                      <CreditCard className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <span className="font-medium">Card</span>
+                  </div>
+                  <span className="font-bold">Kes {paymentSplit.Card.toLocaleString()}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Top Products */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Top Selling Items</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {topProducts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No sales yet.</p>
+                ) : (
+                  topProducts.map((product, i) => (
+                    <div key={i} className="flex items-center justify-between text-sm">
+                      <span className="truncate max-w-[120px]" title={product.name}>{product.name}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-muted-foreground">x{product.quantity}</span>
+                        <span className="font-medium">Kes {product.revenue.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         <div className="grid lg:grid-cols-2 gap-6">
