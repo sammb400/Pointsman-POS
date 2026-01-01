@@ -27,6 +27,7 @@ const navItems = [
   { path: "/dashboard/sales", label: "Sales History", icon: BarChart3 },
   // { path: "/dashboard/employees", label: "Employees", icon: Users },
   { path: "/dashboard/products/add", label: "Add Products", icon: PlusCircle },
+  { path: "/dashboard/products/restock", label: "Restock Products", icon: Package },
   { path: "/dashboard/admin", label: "Admin Portal", icon: Shield, isAdmin: true },
 ];
 

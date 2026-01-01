@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useMemo, type ReactNode } from "react";
 import { useAuth } from "./auth-context";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, onSnapshot, doc, updateDoc, writeBatch, setDoc, collectionGroup, query, where, getDocs, getDoc } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, doc, updateDoc, writeBatch, setDoc, collectionGroup, query, where, getDocs, getDoc, increment } from "firebase/firestore";
 
 export interface Product {
   id: string; // Firestore uses string IDs
@@ -73,6 +73,7 @@ interface POSContextType {
   updateSettings: (newSettings: Partial<Settings>) => Promise<void>;
   addProduct: (product: Omit<Product, "id" | "addedByUid" | "addedByEmail">) => Promise<void>;
   updateProductStock: (productId: string, newStock: number) => Promise<void>;
+  restockProduct: (productId: string, amount: number) => Promise<void>;
   addToCart: (product: Product) => void;
   employees: Employee[];
   addEmployee: (employee: Omit<Employee, "id">) => Promise<void>;
@@ -117,8 +118,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
   });
 
   const [sales, setSales] = useState<Sale[]>(() => {
-    const stored = localStorage.getItem(STORAGE_KEYS.sales);
-    return stored ? JSON.parse(stored) : [];
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.sales);
+      return stored ? JSON.parse(stored) : [];
+    } catch (error) {
+      console.error("Failed to load sales from localStorage:", error);
+      return [];
+    }
   });
 
   // Determine the correct business ID (Owner UID)
@@ -167,6 +173,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     if (!currentUser || !businessId) {
       setProducts([]);
       setEmployees([]);
+      setSales([]);
       return;
     }
 
@@ -201,10 +208,28 @@ export function POSProvider({ children }: { children: ReactNode }) {
       }
     });
 
+    // Fetch Sales
+    const salesCollection = collection(db, "businesses", businessId, "sales");
+    const unsubscribeSales = onSnapshot(salesCollection, (snapshot) => {
+      const salesData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      } as Sale));
+      // Sort by date descending (newest first)
+      salesData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setSales(salesData);
+      try {
+        localStorage.setItem(STORAGE_KEYS.sales, JSON.stringify(salesData));
+      } catch (error) {
+        console.error("Failed to save sales to localStorage:", error);
+      }
+    });
+
     return () => {
       unsubscribeProducts();
       unsubscribeEmployees();
       unsubscribeSettings();
+      unsubscribeSales();
     };
   }, [currentUser, businessId]);
 
@@ -216,11 +241,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
       console.error("Failed to save cart to localStorage:", error);
     }
   }, [cart]);
-
-  // Persist sales to localStorage
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.sales, JSON.stringify(sales));
-  }, [sales]);
 
   const updateSettings = async (newSettings: Partial<Settings>) => {
     if (!currentUser || !businessId) return;
@@ -238,7 +258,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
       addedByUid: currentUser.uid,
       addedByEmail: currentUser.email || "Unknown", // Fallback if email is not available
     };
-    const productsCollection = collection(db, "stockedPointsman");
+    const productsCollection = collection(db, "businesses", businessId, "products");
     await addDoc(productsCollection, productData);
   };
 
@@ -246,6 +266,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
     if (!currentUser || !businessId) throw new Error("No user logged in to update stock.");
     const productDoc = doc(db, "businesses", businessId, "products", productId);
     await updateDoc(productDoc, { stock: newStock });
+  };
+
+  const restockProduct = async (productId: string, amount: number) => {
+    if (!currentUser || !businessId) throw new Error("No user logged in to restock.");
+    const productDoc = doc(db, "businesses", businessId, "products", productId);
+    await updateDoc(productDoc, { stock: increment(amount) });
   };
 
   const addEmployee = async (employee: Omit<Employee, "id">) => {
@@ -358,8 +384,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         // to avoid using stale stock data from the cart item.
         const productInState = products.find(p => p.id === item.id);
         if (productInState) {
-          const newStock = productInState.stock - item.quantity;
-          batch.update(productRef, { stock: newStock });
+          batch.update(productRef, { stock: increment(-item.quantity) });
         }
       });
       // Also add the new sale to the batch
@@ -372,9 +397,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
       return null; // Return null to indicate the sale failed
     }
     
-    // Add to sales history
-    setSales(prev => [sale, ...prev]);
-
     // Clear the cart
     clearCart();
 
@@ -428,6 +450,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         scanBarcode,
         addProduct,
         updateProductStock,
+        restockProduct,
         addToCart,
         updateCartQuantity,
         removeFromCart,

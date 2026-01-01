@@ -13,6 +13,7 @@ import Employees from "@/pages/employees";
 import Shop from "@/pages/shop";
 import SalesHistory from "@/pages/sales-history";
 import AddProduct from "@/pages/add-product";
+import RestockProduct from "@/pages/restock-product";
 import AdminPortal from "@/pages/admin/index";
 import AdminEmployees from "@/pages/admin/employees";
 import AdminStock from "@/pages/admin/stock";
@@ -31,6 +32,7 @@ function Router() {
       <Route path="/dashboard/shop" component={Shop} />
       <Route path="/dashboard/sales" component={SalesHistory} />
       <Route path="/dashboard/products/add" component={AddProduct} />
+      <Route path="/dashboard/products/restock" component={RestockProduct} />
       <Route path="/dashboard/admin" component={AdminPortal} />
       <Route path="/dashboard/admin/employees" component={AdminEmployees} />
       <Route path="/dashboard/admin/stock" component={AdminStock} />
