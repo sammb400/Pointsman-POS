@@ -253,6 +253,16 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const addProduct = async (product: Omit<Product, "id" | "addedByUid" | "addedByEmail">) => {
     if (!currentUser || !businessId) throw new Error("No user logged in to add product.");
 
+    // Check if product with same barcode exists
+    if (product.barcode) {
+      const existingProduct = products.find(p => p.barcode === product.barcode);
+      if (existingProduct) {
+        // If it exists, update the stock instead of creating a duplicate
+        await restockProduct(existingProduct.id, product.stock);
+        return;
+      }
+    }
+
     const productData = {
       ...product,
       addedByUid: currentUser.uid,

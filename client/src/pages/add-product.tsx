@@ -6,10 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Package, ArrowLeft, Upload, ImageIcon } from "lucide-react";
+import { Package, ArrowLeft, Upload, ImageIcon, Camera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { usePOS } from "@/context/pos-context";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useZxing } from "react-zxing";
 
 interface FormErrors {
   name?: string;
@@ -36,11 +38,43 @@ export default function AddProduct() {
     category: "",
     description: "",
     image: "",
+    barcode: "",
   });
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isUploading, setIsUploading] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const cloudinaryWidget = useRef<any>(null);
+
+  // Barcode Scanner Logic for USB Scanners
+  const barcodeBuffer = useRef("");
+  const lastKeyTime = useRef(0);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore input if the user is typing in an input field or textarea
+      if ((e.target as HTMLElement).tagName === "INPUT" || (e.target as HTMLElement).tagName === "TEXTAREA") return;
+
+      const currentTime = Date.now();
+      if (currentTime - lastKeyTime.current > 2000) {
+        barcodeBuffer.current = "";
+      }
+      lastKeyTime.current = currentTime;
+
+      if (e.key === "Enter") {
+        if (barcodeBuffer.current) {
+          setFormData(prev => ({ ...prev, barcode: barcodeBuffer.current }));
+          toast({ title: "Barcode Scanned", description: barcodeBuffer.current });
+          barcodeBuffer.current = "";
+        }
+      } else if (e.key.length === 1) {
+        barcodeBuffer.current += e.key;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [toast]);
 
   const handleChange = (field: string) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -141,6 +175,7 @@ export default function AddProduct() {
         category: formData.category.charAt(0).toUpperCase() + formData.category.slice(1),
         description: formData.description.trim(),
         image: formData.image,
+        barcode: formData.barcode.trim() || undefined,
       });
     } catch (error) {
       console.error("Failed to add product:", error);
@@ -161,6 +196,7 @@ export default function AddProduct() {
       category: "",
       description: "",
       image: "",
+      barcode: "",
     });
     setImagePreview(null);
     setErrors({});
@@ -272,6 +308,29 @@ export default function AddProduct() {
                 )}
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="barcode">Barcode (Optional)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="barcode"
+                    placeholder="Scan or enter barcode"
+                    value={formData.barcode}
+                    onChange={handleChange("barcode")}
+                    data-testid="input-product-barcode"
+                    className="h-12"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-12 w-12 shrink-0"
+                    onClick={() => setIsScannerOpen(true)}
+                    title="Scan Barcode"
+                  >
+                    <Camera className="h-5 w-5" />
+                  </Button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="price">Price (Kes) *</Label>
@@ -363,6 +422,49 @@ export default function AddProduct() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Scan Barcode</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-center p-4">
+            {isScannerOpen && (
+              <BarcodeScanner 
+                onScan={(code) => {
+                  setFormData(prev => ({ ...prev, barcode: code }));
+                  setIsScannerOpen(false);
+                  toast({ title: "Barcode Scanned", description: code });
+                }} 
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
+  );
+}
+
+function BarcodeScanner({ onScan }: { onScan: (data: string) => void }) {
+  const lastScan = useRef("");
+  const lastTime = useRef(0);
+
+  const { ref } = useZxing({
+    onDecodeResult(result: any) {
+      const text = result.getText();
+      const now = Date.now();
+      if (text === lastScan.current && now - lastTime.current < 2000) return;
+      
+      lastScan.current = text;
+      lastTime.current = now;
+      onScan(text);
+    },
+  });
+
+  return (
+    <div className="relative w-full aspect-square max-w-sm overflow-hidden rounded-lg bg-black">
+      <video ref={ref as any} className="w-full h-full object-cover" />
+      <div className="absolute inset-0 border-2 border-primary/50 m-12 rounded-lg pointer-events-none animate-pulse" />
+    </div>
   );
 }

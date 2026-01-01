@@ -1,15 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { usePOS } from "../context/pos-context";
 import DashboardLayout from "@/components/dashboard-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Minus } from "lucide-react";
+import { Search, Plus, Minus, Camera } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useZxing } from "react-zxing";
 
 export default function RestockProduct() {
+  const { toast } = useToast();
   const { products, restockProduct } = usePOS();
   const [searchTerm, setSearchTerm] = useState("");
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   // Filter products based on search term
   const filteredProducts = products.filter((product) =>
@@ -24,6 +29,55 @@ export default function RestockProduct() {
       alert("Failed to update stock. Please try again.");
     }
   };
+
+  const handleScan = async (barcode: string) => {
+    const product = products.find((p) => p.barcode === barcode);
+    if (product) {
+      try {
+        await restockProduct(product.id, 1);
+        toast({
+          title: "Stock Updated",
+          description: `Added 1 unit to ${product.name}`,
+        });
+      } catch (error) {
+        console.error("Failed to update stock:", error);
+      }
+    } else {
+      toast({
+        title: "Not Found",
+        description: `No product found with barcode: ${barcode}`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Barcode Scanner Logic for USB Scanners
+  const barcodeBuffer = useRef("");
+  const lastKeyTime = useRef(0);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement).tagName === "INPUT") return;
+
+      const currentTime = Date.now();
+      if (currentTime - lastKeyTime.current > 2000) {
+        barcodeBuffer.current = "";
+      }
+      lastKeyTime.current = currentTime;
+
+      if (e.key === "Enter") {
+        if (barcodeBuffer.current) {
+          handleScan(barcodeBuffer.current);
+          barcodeBuffer.current = "";
+        }
+      } else if (e.key.length === 1) {
+        barcodeBuffer.current += e.key;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [products]);
 
   return (
     <DashboardLayout>
@@ -42,6 +96,14 @@ export default function RestockProduct() {
               className="pl-10"
             />
           </div>
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={() => setIsScannerOpen(true)}
+            title="Scan Barcode with Camera"
+          >
+            <Camera className="h-4 w-4" />
+          </Button>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 pb-20">
@@ -107,6 +169,48 @@ export default function RestockProduct() {
           )}
         </div>
       </div>
+
+      <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Scan Product Barcode</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-center p-4">
+            {isScannerOpen && (
+              <BarcodeScanner 
+                onScan={(barcode) => {
+                  handleScan(barcode);
+                  setIsScannerOpen(false);
+                }} 
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
+  );
+}
+
+function BarcodeScanner({ onScan }: { onScan: (data: string) => void }) {
+  const lastScan = useRef("");
+  const lastTime = useRef(0);
+
+  const { ref } = useZxing({
+    onDecodeResult(result: any) {
+      const text = result.getText();
+      const now = Date.now();
+      if (text === lastScan.current && now - lastTime.current < 2000) return;
+      
+      lastScan.current = text;
+      lastTime.current = now;
+      onScan(text);
+    },
+  });
+
+  return (
+    <div className="relative w-full aspect-square max-w-sm overflow-hidden rounded-lg bg-black">
+      <video ref={ref as any} className="w-full h-full object-cover" />
+      <div className="absolute inset-0 border-2 border-primary/50 m-12 rounded-lg pointer-events-none animate-pulse" />
+    </div>
   );
 }
