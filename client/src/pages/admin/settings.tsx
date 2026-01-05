@@ -6,9 +6,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Settings, Store, Bell, Shield, Save, Loader2 } from "lucide-react";
+import { Settings, Store, Bell, Shield, Save, Loader2, Palette } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePOS } from "@/context/pos-context";
+
+const PRESET_COLORS = [
+  { name: "Tomato", value: "#FF6347" },
+  { name: "Blue", value: "#2563EB" },
+  { name: "Green", value: "#16A34A" },
+  { name: "Purple", value: "#9333EA" },
+  { name: "Orange", value: "#EA580C" },
+  { name: "Slate", value: "#475569" },
+];
 
 export default function AdminSettings() {
   const { toast } = useToast();
@@ -20,8 +29,7 @@ export default function AdminSettings() {
     storeName: "",
     currency: "KES",
     taxRate: "0",
-    accentColor: "#FF6347",
-    backgroundColor: "#ffffff",
+    themeColor: "#FF6347",
     enableNotifications: true,
     enableLowStockAlerts: true,
     lowStockThreshold: "10",
@@ -146,6 +154,61 @@ export default function AdminSettings() {
                   data-testid="input-tax-rate"
                 />
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Appearance Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Palette className="h-5 w-5" />
+              Appearance
+            </CardTitle>
+            <CardDescription>Customize the look and feel of the application</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <Label>Primary Theme Color</Label>
+              
+              <div className="flex flex-wrap gap-3">
+                {PRESET_COLORS.map((color) => (
+                  <button
+                    key={color.value}
+                    type="button"
+                    className={`w-8 h-8 rounded-full border shadow-sm transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
+                      formData.themeColor.toLowerCase() === color.value.toLowerCase() ? "ring-2 ring-ring ring-offset-2" : ""
+                    }`}
+                    style={{ backgroundColor: color.value }}
+                    onClick={() => handleChange("themeColor", color.value)}
+                    title={color.name}
+                  />
+                ))}
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <Input
+                  id="themeColor"
+                  type="color"
+                  value={formData.themeColor}
+                  onChange={(e) => handleChange("themeColor", e.target.value)}
+                  className="w-12 h-10 p-1 cursor-pointer"
+                  data-testid="input-theme-color"
+                />
+                <div className="flex-1 max-w-[150px]">
+                  <Input
+                    type="text"
+                    value={formData.themeColor}
+                    onChange={(e) => handleChange("themeColor", e.target.value)}
+                    placeholder="#000000"
+                    className="font-mono uppercase"
+                    maxLength={7}
+                    data-testid="input-theme-color-hex"
+                  />
+                </div>
+                <span className="text-sm text-muted-foreground">Custom Hex</span>
+              </div>
+              <p className="text-xs text-muted-foreground">Select a preset or enter a custom hex code for buttons and accents.</p>
             </div>
           </CardContent>
         </Card>
