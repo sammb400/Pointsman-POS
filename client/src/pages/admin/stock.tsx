@@ -3,18 +3,27 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Package, Search, AlertTriangle, CheckCircle, XCircle, RefreshCw } from "lucide-react";
-import { usePOS } from "@/context/pos-context";
+import { Package, Search, AlertTriangle, CheckCircle, XCircle, RefreshCw, Trash2 } from "lucide-react";
+import { usePOS, type Product } from "@/context/pos-context";
 import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AdminStock() {
-  const { products } = usePOS();
+  const { products, settings, restockProduct, deleteProduct } = usePOS();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<"All" | "OK" | "Low" | "Critical">("All");
+  const [reorderProduct, setReorderProduct] = useState<Product | null>(null);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [reorderAmount, setReorderAmount] = useState("10");
+
+  const lowStockThreshold = settings.lowStockThreshold || 10;
 
   const getReorderStatus = (stock: number) => {
     if (stock === 0) return "Critical";
-    if (stock <= 10) return "Low";
+    if (stock <= lowStockThreshold) return "Low";
     return "OK";
   };
 
@@ -60,6 +69,40 @@ export default function AdminStock() {
     }
   };
 
+  const handleReorderSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reorderProduct) return;
+    
+    const amount = parseInt(reorderAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({ title: "Invalid Amount", description: "Please enter a valid quantity.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      await restockProduct(reorderProduct.id, amount);
+      toast({
+        title: "Stock Updated",
+        description: `Added ${amount} units to ${reorderProduct.name}.`,
+      });
+      setReorderProduct(null);
+      setReorderAmount("10");
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update stock.", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteProduct = async () => {
+    if (!productToDelete) return;
+    try {
+      await deleteProduct(productToDelete.id);
+      toast({ title: "Product Deleted", description: `${productToDelete.name} has been removed from inventory.` });
+      setProductToDelete(null);
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to delete product.", variant: "destructive" });
+    }
+  };
+
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -95,7 +138,7 @@ export default function AdminStock() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Low Stock (≤10)</p>
+                  <p className="text-sm text-muted-foreground">Low Stock (≤{lowStockThreshold})</p>
                   <p className="text-3xl font-bold text-yellow-500">{lowCount}</p>
                 </div>
                 <AlertTriangle className="h-8 w-8 text-yellow-500" />
@@ -181,12 +224,12 @@ export default function AdminStock() {
                         <Badge variant="outline">{product.category}</Badge>
                       </td>
                       <td className="py-4 px-4 font-medium">
-                        ${product.price.toFixed(2)}
+                        Kes {product.price.toFixed(2)}
                       </td>
                       <td className="py-4 px-4 text-center">
                         <span className={`font-bold text-lg ${
                           product.stock === 0 ? "text-red-500" :
-                          product.stock <= 10 ? "text-yellow-600" : ""
+                          product.stock <= lowStockThreshold ? "text-yellow-600" : ""
                         }`}>
                           {product.stock}
                         </span>
@@ -195,13 +238,24 @@ export default function AdminStock() {
                         {getStatusBadge(product.reorderStatus)}
                       </td>
                       <td className="py-4 px-4 text-right">
-                        <Button 
-                          size="sm" 
-                          variant={product.reorderStatus === "Critical" ? "default" : "outline"}
-                          data-testid={`button-reorder-${product.id}`}
-                        >
-                          Reorder
-                        </Button>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button 
+                            size="sm" 
+                            variant={product.reorderStatus === "Critical" ? "default" : "outline"}
+                            data-testid={`button-reorder-${product.id}`}
+                            onClick={() => setReorderProduct(product)}
+                          >
+                            Reorder
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => setProductToDelete(product)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -211,6 +265,52 @@ export default function AdminStock() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Reorder Dialog */}
+      <Dialog open={!!reorderProduct} onOpenChange={(open) => !open && setReorderProduct(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reorder Stock</DialogTitle>
+          </DialogHeader>
+          {reorderProduct && (
+            <form onSubmit={handleReorderSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Product</Label>
+                <div className="font-medium">{reorderProduct.name}</div>
+                <div className="text-sm text-muted-foreground">Current Stock: {reorderProduct.stock}</div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reorder-amount">Quantity to Add</Label>
+                <Input
+                  id="reorder-amount"
+                  type="number"
+                  min="1"
+                  value={reorderAmount}
+                  onChange={(e) => setReorderAmount(e.target.value)}
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full">Confirm Reorder</Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Product</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p>Are you sure you want to delete <strong>{productToDelete?.name}</strong>? This action cannot be undone.</p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setProductToDelete(null)}>Cancel</Button>
+              <Button variant="destructive" onClick={handleDeleteProduct}>Delete</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }

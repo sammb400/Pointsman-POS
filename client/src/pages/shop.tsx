@@ -206,7 +206,7 @@ export default function Shop() {
                     <h3 className="font-medium text-sm truncate">{product.name}</h3>
                     <p className="text-primary font-bold">Kes {product.price.toFixed(2)}</p>
                     <Badge 
-                      variant={product.stock <= (settings.lowStockThreshold || 5) ? "destructive" : "outline"} 
+                      variant={product.stock <= (settings.lowStockThreshold || 10) ? "destructive" : "outline"} 
                       className="mt-1 text-xs"
                     >
                       {product.stock <= 0 ? "Out of Stock" : `Stock: ${product.stock}`}

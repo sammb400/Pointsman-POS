@@ -2,7 +2,7 @@ import { useState } from "react";
 import AdminLayout from "@/components/admin-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign, TrendingUp, ShoppingBag, CreditCard, Banknote, BarChart3, PieChart, Calendar } from "lucide-react";
+import { DollarSign, TrendingUp, ShoppingBag, Smartphone, Banknote, BarChart3, PieChart, Calendar } from "lucide-react";
 import { usePOS } from "@/context/pos-context";
 
 export default function AdminFinancials() {
@@ -37,8 +37,8 @@ export default function AdminFinancials() {
   const cashRevenue = filteredSales
     .filter(s => s.paymentType === "Cash")
     .reduce((sum, sale) => sum + sale.total, 0);
-  const cardRevenue = filteredSales
-    .filter(s => s.paymentType === "Card")
+  const mpesaRevenue = filteredSales
+    .filter(s => s.paymentType === "M-Pesa")
     .reduce((sum, sale) => sum + sale.total, 0);
 
   const totalItemsSold = filteredSales.reduce(
@@ -133,18 +133,20 @@ export default function AdminFinancials() {
             </CardContent>
           </Card>
 
-          <Card className="hover-elevate">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Tax Collected
-              </CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">Kes {totalTax.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground mt-1">{settings.taxRate}% tax rate</p>
-            </CardContent>
-          </Card>
+          {(settings.taxRate > 0 || totalTax > 0) && (
+            <Card className="hover-elevate">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Tax Collected
+                </CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold">Kes {totalTax.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground mt-1">{settings.taxRate}% tax rate</p>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Revenue by Payment Type */}
@@ -174,21 +176,21 @@ export default function AdminFinancials() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Card Revenue
+                <Smartphone className="h-5 w-5" />
+                M-Pesa Revenue
               </CardTitle>
-              <CardDescription>Revenue collected via card payments</CardDescription>
+              <CardDescription>Revenue collected via M-Pesa payments</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold text-blue-600">Kes {cardRevenue.toFixed(2)}</div>
+              <div className="text-4xl font-bold text-blue-600">Kes {mpesaRevenue.toFixed(2)}</div>
               <div className="mt-4 h-3 bg-muted rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-blue-500 transition-all"
-                  style={{ width: totalRevenue > 0 ? `${(cardRevenue / totalRevenue) * 100}%` : '0%' }}
+                  style={{ width: totalRevenue > 0 ? `${(mpesaRevenue / totalRevenue) * 100}%` : '0%' }}
                 />
               </div>
               <p className="text-sm text-muted-foreground mt-2">
-                {totalRevenue > 0 ? ((cardRevenue / totalRevenue) * 100).toFixed(1) : 0}% of total revenue
+                {totalRevenue > 0 ? ((mpesaRevenue / totalRevenue) * 100).toFixed(1) : 0}% of total revenue
               </p>
             </CardContent>
           </Card>

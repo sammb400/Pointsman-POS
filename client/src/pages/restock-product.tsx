@@ -152,7 +152,7 @@ export default function RestockProduct() {
                   <h3 className="font-medium text-sm truncate" title={product.name}>{product.name}</h3>
                   <p className="text-muted-foreground text-xs">{product.category}</p>
                   <Badge 
-                    variant={product.stock <= (settings.lowStockThreshold || 5) ? "destructive" : "outline"} 
+                    variant={product.stock <= (settings.lowStockThreshold || 10) ? "destructive" : "outline"} 
                     className="mt-1 text-xs"
                   >
                     {product.stock <= 0 ? "Out of Stock" : `Stock: ${product.stock}`}
@@ -171,7 +171,7 @@ export default function RestockProduct() {
                   </Button>
 
                   <div className="flex flex-col items-center min-w-[2rem]">
-                    <span className={`font-bold ${product.stock <= (settings.lowStockThreshold || 5) ? "text-destructive" : ""}`}>
+                    <span className={`font-bold ${product.stock <= (settings.lowStockThreshold || 10) ? "text-destructive" : ""}`}>
                       {product.stock}
                     </span>
                   </div>

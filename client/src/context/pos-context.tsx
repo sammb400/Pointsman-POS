@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useMemo, type ReactNode } from "react";
 import { useAuth } from "./auth-context";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, onSnapshot, doc, updateDoc, writeBatch, setDoc, collectionGroup, query, where, getDocs, getDoc, increment } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, doc, updateDoc, writeBatch, setDoc, collectionGroup, query, where, getDocs, getDoc, increment, deleteDoc } from "firebase/firestore";
 
 export interface Product {
   id: string; // Firestore uses string IDs
@@ -73,6 +73,7 @@ interface POSContextType {
   updateSettings: (newSettings: Partial<Settings>) => Promise<void>;
   addProduct: (product: Omit<Product, "id" | "addedByUid" | "addedByEmail">) => Promise<void>;
   updateProduct: (productId: string, updates: Partial<Product>) => Promise<void>;
+  deleteProduct: (productId: string) => Promise<void>;
   updateProductStock: (productId: string, newStock: number) => Promise<void>;
   restockProduct: (productId: string, amount: number) => Promise<void>;
   addToCart: (product: Product) => void;
@@ -283,6 +284,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
     await updateDoc(productDoc, updates);
   };
 
+  const deleteProduct = async (productId: string) => {
+    if (!currentUser || !businessId) throw new Error("No user logged in to delete product.");
+    const productDoc = doc(db, "businesses", businessId, "products", productId);
+    await deleteDoc(productDoc);
+  };
+
   const updateProductStock = async (productId: string, newStock: number) => {
     if (!currentUser || !businessId) throw new Error("No user logged in to update stock.");
     const productDoc = doc(db, "businesses", businessId, "products", productId);
@@ -478,6 +485,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         scanBarcode,
         addProduct,
         updateProduct,
+        deleteProduct,
         updateProductStock,
         restockProduct,
         addToCart,

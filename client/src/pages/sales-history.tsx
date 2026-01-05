@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Receipt, CreditCard, Banknote, Search, Calendar, DollarSign, ShoppingBag, ChevronDown, ChevronRight } from "lucide-react";
+import { Receipt, Smartphone, Banknote, Search, Calendar, DollarSign, ShoppingBag, ChevronDown, ChevronRight } from "lucide-react";
 import { usePOS, type Sale } from "@/context/pos-context";
 import { useState } from "react";
 
@@ -17,7 +17,7 @@ interface GroupedSales {
 export default function SalesHistory() {
   const { sales } = usePOS();
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState<"All" | "Cash" | "Card">("All");
+  const [filterType, setFilterType] = useState<"All" | "Cash" | "M-Pesa">("All");
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
 
   const filteredSales = sales.filter(sale => {
@@ -76,7 +76,7 @@ export default function SalesHistory() {
   const totalRevenue = sales.reduce((sum, sale) => sum + sale.total, 0);
   const totalTransactions = sales.length;
   const cashTransactions = sales.filter(s => s.paymentType === "Cash").length;
-  const cardTransactions = sales.filter(s => s.paymentType === "Card").length;
+  const mpesaTransactions = sales.filter(s => s.paymentType === "M-Pesa").length;
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -140,14 +140,14 @@ export default function SalesHistory() {
           <Card className="hover-elevate">
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Card Payments
+                M-Pesa Payments
               </CardTitle>
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
+              <Smartphone className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{cardTransactions}</div>
+              <div className="text-2xl font-bold">{mpesaTransactions}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                {totalTransactions > 0 ? ((cardTransactions / totalTransactions) * 100).toFixed(0) : 0}% of total
+                {totalTransactions > 0 ? ((mpesaTransactions / totalTransactions) * 100).toFixed(0) : 0}% of total
               </p>
             </CardContent>
           </Card>
@@ -166,7 +166,7 @@ export default function SalesHistory() {
             />
           </div>
           <div className="flex gap-2 flex-wrap">
-            {(["All", "Cash", "Card"] as const).map(type => (
+            {(["All", "Cash", "M-Pesa"] as const).map(type => (
               <Button
                 key={type}
                 variant={filterType === type ? "default" : "outline"}
@@ -175,7 +175,7 @@ export default function SalesHistory() {
                 data-testid={`button-filter-${type.toLowerCase()}`}
               >
                 {type === "Cash" && <Banknote className="h-4 w-4 mr-1" />}
-                {type === "Card" && <CreditCard className="h-4 w-4 mr-1" />}
+                {type === "M-Pesa" && <Smartphone className="h-4 w-4 mr-1" />}
                 {type}
               </Button>
             ))}
@@ -280,7 +280,7 @@ export default function SalesHistory() {
                                     {sale.paymentType === "Cash" ? (
                                       <Banknote className="h-3 w-3" />
                                     ) : (
-                                      <CreditCard className="h-3 w-3" />
+                                      <Smartphone className="h-3 w-3" />
                                     )}
                                     {sale.paymentType}
                                   </Badge>
