@@ -29,9 +29,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
       {/* Admin Header Banner */}
-      <div className="bg-primary text-primary-foreground sticky top-0 z-30">
+      <div className="bg-primary text-primary-foreground z-30 flex-shrink-0">
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -62,7 +62,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </div>
       </div>
 
-      <div className="flex relative">
+      <div className="flex flex-1 relative overflow-hidden">
         {/* Mobile Overlay */}
         {mobileOpen && (
           <div 
@@ -78,7 +78,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           transform transition-transform duration-300 ease-in-out
           ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
           md:translate-x-0
-          h-full md:min-h-[calc(100vh-64px)]
+          h-full overflow-y-auto
         `}>
           <nav className="p-4 space-y-1">
             {adminNavItems.map((item) => {
@@ -113,7 +113,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 p-4 md:p-6 lg:p-8 w-full">
+        <main className="flex-1 p-4 md:p-6 lg:p-8 w-full overflow-y-auto">
           {children}
         </main>
       </div>

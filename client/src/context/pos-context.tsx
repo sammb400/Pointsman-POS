@@ -365,22 +365,22 @@ export function POSProvider({ children }: { children: ReactNode }) {
   
     const { subtotal, tax, total } = getCartTotals(); // This now uses the memoized function
     
-    // Calculate change for cash payments
-    const changeDue = paymentType === "Cash" && amountTendered 
-      ? amountTendered - total 
-      : 0;
+    // Calculate change (defaults to 0 if amountTendered is undefined)
+    // For M-Pesa (or Card), exact amount is charged, so change is always 0
+    const changeDue = (paymentType === "Cash" && amountTendered) ? amountTendered - total : 0;
 
     // Create sale record
     const sale: Sale = {
       id: `SALE-${Date.now()}`,
       date: new Date().toISOString(),
-      items: [...cart],
+      // Sanitize items to remove undefined values which Firestore rejects
+      items: JSON.parse(JSON.stringify(cart)),
       subtotal,
       tax,
       total,
       paymentType,
-      amountTendered: paymentType === "Cash" ? amountTendered : undefined,
-      changeDue: paymentType === "Cash" ? changeDue : undefined,
+      amountTendered: amountTendered ?? 0,
+      changeDue: changeDue,
       soldByUid: currentUser.uid,
       soldByEmail: currentUser.email || "Unknown",
     };

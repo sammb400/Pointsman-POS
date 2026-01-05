@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
+import { usePOS } from "@/context/pos-context";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -37,6 +38,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { logout, userRole } = useAuth();
   const { toast } = useToast();
+  const { settings } = usePOS();
 
   const handleSignOut = async () => {
     try {
@@ -86,7 +88,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           <Link href="/dashboard">
             <div className="flex items-center gap-2 hover-elevate px-2 py-1 rounded-md">
               <ShoppingCart className="h-6 w-6 text-primary flex-shrink-0" />
-              {!collapsed && <span className="font-bold text-lg">ModernPOS</span>}
+              {!collapsed && <span className="font-bold text-lg">{settings?.storeName}</span>}
             </div>
           </Link>
         </div>
@@ -96,6 +98,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           {navItems.filter(item => !item.isAdmin).map((item) => {
             const isActive = location === item.path || 
               (item.path !== "/dashboard" && location.startsWith(item.path));
+            
+            // Show threshold in menu label if applicable to verify the setting is active
+            let label = item.label;
+            if (item.label === "Restock Products" && settings?.enableLowStockAlerts && settings?.lowStockThreshold) {
+              label = `${item.label} (≤ ${settings.lowStockThreshold})`;
+            }
+
             return (
               <Link key={item.path} href={item.path}>
                 <div
@@ -108,7 +117,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                 >
                   <item.icon className="h-5 w-5 flex-shrink-0" />
-                  {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
+                  {!collapsed && <span className="text-sm font-medium">{label}</span>}
                 </div>
               </Link>
             );

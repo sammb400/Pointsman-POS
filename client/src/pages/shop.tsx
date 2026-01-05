@@ -83,21 +83,37 @@ export default function Shop() {
       return;
     }
 
-    // Pass the current cart to finalizeSale so it can update stock
-    const sale = await finalizeSale(
-      cart, 
-      paymentType, 
-      paymentType === "Cash" ? tenderedAmount : undefined);
-    
-    if (sale) {
+    try {
+      // Pass the current cart to finalizeSale so it can update stock
+      // For M-Pesa, we pass the exact total automatically
+      const finalAmount = paymentType === "Cash" ? tenderedAmount : Number(total.toFixed(2));
+
+      const sale = await finalizeSale(cart, paymentType, finalAmount);
+      
+      if (sale) {
+        toast({
+          title: "Sale Complete!",
+          description: `Transaction ${sale.id} - Kes ${sale.total.toFixed(2)} via ${paymentType}${
+            paymentType === "Cash" && sale.changeDue ? ` | Change: Kes ${sale.changeDue.toFixed(2)}` : ""
+          }`,
+        });
+        setAmountTendered("");
+        setShowCheckout(false);
+      } else {
+        // Handle case where finalizeSale returns null (failed internally)
+        toast({
+          title: "Transaction Failed",
+          description: "Could not complete the sale. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Sale processing error:", error);
       toast({
-        title: "Sale Complete!",
-        description: `Transaction ${sale.id} - Kes ${sale.total.toFixed(2)} via ${paymentType}${
-          paymentType === "Cash" && sale.changeDue ? ` | Change: Kes ${sale.changeDue.toFixed(2)}` : ""
-        }`,
+        title: "Transaction Failed",
+        description: "Could not complete the sale. Please try again.",
+        variant: "destructive",
       });
-      setAmountTendered("");
-      setShowCheckout(false);
     }
   };
 
@@ -190,7 +206,7 @@ export default function Shop() {
                     <h3 className="font-medium text-sm truncate">{product.name}</h3>
                     <p className="text-primary font-bold">Kes {product.price.toFixed(2)}</p>
                     <Badge 
-                      variant={product.stock <= 5 ? "destructive" : "outline"} 
+                      variant={product.stock <= (settings.lowStockThreshold || 5) ? "destructive" : "outline"} 
                       className="mt-1 text-xs"
                     >
                       {product.stock <= 0 ? "Out of Stock" : `Stock: ${product.stock}`}
@@ -420,7 +436,7 @@ export default function Shop() {
                           <div className="flex items-center gap-2">
                             <Smartphone className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                             <span className="text-sm text-blue-600 dark:text-blue-400">
-                              M-Pesa payment will be processed
+                              M-Pesa payment of <strong>Kes {total.toFixed(2)}</strong> will be processed
                             </span>
                           </div>
                         </div>

@@ -6,19 +6,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Settings, Store, Bell, Shield, Save } from "lucide-react";
+import { Settings, Store, Bell, Shield, Save, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePOS } from "@/context/pos-context";
 
 export default function AdminSettings() {
   const { toast } = useToast();
   const { settings: contextSettings, updateSettings } = usePOS();
+  const [isSaving, setIsSaving] = useState(false);
   
   // Local state for form handling
   const [formData, setFormData] = useState({
-    storeName: "ModernPOS Store",
+    storeName: "",
     currency: "KES",
-    taxRate: "16",
+    taxRate: "0",
     accentColor: "#FF6347",
     backgroundColor: "#ffffff",
     enableNotifications: true,
@@ -29,12 +30,15 @@ export default function AdminSettings() {
 
   // Sync local state with context settings when they load
   useEffect(() => {
-    setFormData(prev => ({
-      ...prev,
-      ...contextSettings,
-      taxRate: contextSettings.taxRate.toString(),
-      lowStockThreshold: contextSettings.lowStockThreshold.toString(),
-    }));
+    if (contextSettings) {
+      setFormData(prev => ({
+        ...prev,
+        ...contextSettings,
+        // Use saved tax rate from context if available, otherwise keep default
+        taxRate: contextSettings.taxRate !== undefined ? contextSettings.taxRate.toString() : prev.taxRate,
+        lowStockThreshold: contextSettings.lowStockThreshold?.toString() ?? prev.lowStockThreshold,
+      }));
+    }
   }, [contextSettings]);
 
   const handleChange = (field: string, value: string | boolean) => {
@@ -42,11 +46,24 @@ export default function AdminSettings() {
   };
 
   const handleSave = async () => {
+    const taxRate = parseFloat(formData.taxRate);
+    const lowStockThreshold = parseInt(formData.lowStockThreshold);
+
+    if (isNaN(taxRate) || isNaN(lowStockThreshold)) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter valid numbers for Tax Rate and Low Stock Threshold.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSaving(true);
     try {
       await updateSettings({
         ...formData,
-        taxRate: parseFloat(formData.taxRate),
-        lowStockThreshold: parseInt(formData.lowStockThreshold),
+        taxRate,
+        lowStockThreshold,
       });
       toast({
         title: "Settings Saved",
@@ -58,6 +75,8 @@ export default function AdminSettings() {
         description: "Failed to save settings.",
         variant: "destructive",
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -109,6 +128,9 @@ export default function AdminSettings() {
                     <SelectItem value="AUD">AUD ($)</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  Updates currency symbol across the system
+                </p>
               </div>
               
               <div className="space-y-2">
@@ -213,8 +235,12 @@ export default function AdminSettings() {
 
         {/* Save Button */}
         <div className="flex justify-end">
-          <Button onClick={handleSave} className="min-w-[150px]" data-testid="button-save-settings">
-            <Save className="h-4 w-4 mr-2" />
+          <Button onClick={handleSave} className="min-w-[150px]" disabled={isSaving} data-testid="button-save-settings">
+            {isSaving ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
             Save Settings
           </Button>
         </div>
