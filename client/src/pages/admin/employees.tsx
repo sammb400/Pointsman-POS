@@ -8,11 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UserPlus, MoreHorizontal, Mail, Phone, Search, Shield } from "lucide-react";
 import { useState } from "react";
-import { usePOS } from "@/context/pos-context";
+import { usePOS, type Employee } from "@/context/pos-context";
 import { useToast } from "@/hooks/use-toast";
 
 export default function AdminEmployees() {
-  const { employees, addEmployee } = usePOS();
+  const { employees, addEmployee, updateEmployeeStatus } = usePOS();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -23,6 +23,7 @@ export default function AdminEmployees() {
     role: "Cashier",
     status: "Active"
   });
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
 
   const handleAddEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +37,20 @@ export default function AdminEmployees() {
       });
     } catch (error) {
       toast({ title: "Error", description: "Failed to add employee.", variant: "destructive" });
+    }
+  };
+
+  const handleStatusUpdate = async (newStatus: string) => {
+    if (!editingEmployee) return;
+    try {
+      await updateEmployeeStatus(editingEmployee.id, newStatus);
+      toast({
+        title: "Status Updated",
+        description: `Employee status updated to ${newStatus}.`,
+      });
+      setEditingEmployee(null);
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update status.", variant: "destructive" });
     }
   };
 
@@ -204,7 +219,12 @@ export default function AdminEmployees() {
                         </span>
                       </td>
                       <td className="py-4 px-4 text-right">
-                        <Button variant="ghost" size="icon" data-testid={`button-employee-actions-${employee.id}`}>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          data-testid={`button-employee-actions-${employee.id}`}
+                          onClick={() => setEditingEmployee(employee)}
+                        >
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </td>
@@ -216,6 +236,37 @@ export default function AdminEmployees() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Edit Employee Status Dialog */}
+      <Dialog open={!!editingEmployee} onOpenChange={(open) => !open && setEditingEmployee(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Manage Employee Status</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid gap-2">
+              <Label>Employee Name</Label>
+              <div className="font-medium">{editingEmployee?.name}</div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-status">Status</Label>
+              <Select 
+                value={editingEmployee?.status} 
+                onValueChange={handleStatusUpdate}
+              >
+                <SelectTrigger id="edit-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="On Leave">On Leave</SelectItem>
+                  <SelectItem value="Inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }

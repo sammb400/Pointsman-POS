@@ -8,6 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ShoppingCart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/auth-context";
+import { db } from "@/lib/firebase";
+import { collectionGroup, query, where, getDocs } from "firebase/firestore";
 
 export default function SignIn() {
   const [email, setEmail] = useState("");
@@ -16,13 +18,26 @@ export default function SignIn() {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const { login } = useAuth();
+  const { login, logout } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     try {
       await login(email, password);
+
+      // Check employee status before redirecting
+      const q = query(collectionGroup(db, "employees"), where("email", "==", email.toLowerCase()));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        const employeeData = querySnapshot.docs[0].data();
+        if (employeeData.status && employeeData.status !== "Active") {
+          await logout();
+          throw new Error(`Access Denied: Your account status is ${employeeData.status}.`);
+        }
+      }
+
       toast({
         title: "Sign In Successful",
         description: "Welcome back! Redirecting you to the dashboard.",
@@ -31,7 +46,10 @@ export default function SignIn() {
     } catch (error: any) {
       console.error("Sign in failed:", error);
       let description = "An unknown error occurred. Please try again.";
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+      
+      if (error.message && error.message.includes("Access Denied")) {
+        description = error.message;
+      } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
         description = "Invalid email or password. Please check your credentials.";
       }
       toast({

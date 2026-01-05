@@ -8,6 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ShoppingCart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/auth-context";
+import { db } from "@/lib/firebase";
+import { collectionGroup, query, where, getDocs } from "firebase/firestore";
 
 export default function SignUp() {
   const [formData, setFormData] = useState({
@@ -22,7 +24,7 @@ export default function SignUp() {
   const [isEmployee, setIsEmployee] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const { signup } = useAuth();
+  const { signup, logout } = useAuth();
   const [, setLocation] = useLocation();
 
   const handleChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,6 +67,19 @@ export default function SignUp() {
         businessName: isEmployee ? "" : formData.businessName,
         phoneNumber: formData.phone,
       });
+
+      // Check employee status immediately after signup
+      const q = query(collectionGroup(db, "employees"), where("email", "==", formData.email.toLowerCase()));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        const employeeData = querySnapshot.docs[0].data();
+        if (employeeData.status && employeeData.status !== "Active") {
+          await logout();
+          throw new Error(`Access Denied: Your account status is ${employeeData.status}.`);
+        }
+      }
+
       toast({
         title: "Account Created!",
         description: `Welcome to Modern POS, ${formData.businessName}!`,
@@ -72,7 +87,10 @@ export default function SignUp() {
       setLocation("/dashboard"); // Redirect to dashboard after successful signup
     } catch (error: any) {
       console.error("Signup failed:", error);
-      const message = error.code === 'auth/email-already-in-use' ? 'This email is already registered.' : 'Failed to create an account.';
+      let message = error.code === 'auth/email-already-in-use' ? 'This email is already registered.' : 'Failed to create an account.';
+      if (error.message && error.message.includes("Access Denied")) {
+        message = error.message;
+      }
       toast({ title: "Sign-up Error", description: message, variant: "destructive" });
     } finally {
       setIsLoading(false);

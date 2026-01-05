@@ -77,6 +77,7 @@ interface POSContextType {
   addToCart: (product: Product) => void;
   employees: Employee[];
   addEmployee: (employee: Omit<Employee, "id">) => Promise<void>;
+  updateEmployeeStatus: (employeeId: string, status: string) => Promise<void>;
   scanBarcode: (barcode: string) => boolean;
   updateCartQuantity: (productId: string, change: number) => void;
   removeFromCart: (productId: string) => void;
@@ -156,7 +157,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
           const querySnapshot = await getDocs(q);
           
           if (!querySnapshot.empty) {
-            const ownerUid = querySnapshot.docs[0].ref.parent.parent?.id;
+            const employeeDoc = querySnapshot.docs[0];
+            const employeeData = employeeDoc.data();
+
+            const ownerUid = employeeDoc.ref.parent.parent?.id;
             if (ownerUid) setBusinessId(ownerUid);
           }
         }
@@ -294,6 +298,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
       email: employee.email.toLowerCase().trim(),
     };
     await addDoc(employeesCollection, employeeData);
+  };
+
+  const updateEmployeeStatus = async (employeeId: string, status: string) => {
+    if (!currentUser || !businessId) throw new Error("No user logged in to update employee.");
+    const employeeDoc = doc(db, "businesses", businessId, "employees", employeeId);
+    await updateDoc(employeeDoc, { status });
   };
 
   const scanBarcode = (barcode: string) => {
@@ -457,6 +467,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         settings,
         updateSettings,
         addEmployee,
+        updateEmployeeStatus,
         scanBarcode,
         addProduct,
         updateProductStock,
