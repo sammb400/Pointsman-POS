@@ -72,6 +72,7 @@ interface POSContextType {
   settings: Settings;
   updateSettings: (newSettings: Partial<Settings>) => Promise<void>;
   addProduct: (product: Omit<Product, "id" | "addedByUid" | "addedByEmail">) => Promise<void>;
+  updateProduct: (productId: string, updates: Partial<Product>) => Promise<void>;
   updateProductStock: (productId: string, newStock: number) => Promise<void>;
   restockProduct: (productId: string, amount: number) => Promise<void>;
   addToCart: (product: Product) => void;
@@ -276,6 +277,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
     await addDoc(productsCollection, productData);
   };
 
+  const updateProduct = async (productId: string, updates: Partial<Product>) => {
+    if (!currentUser || !businessId) throw new Error("No user logged in to update product.");
+    const productDoc = doc(db, "businesses", businessId, "products", productId);
+    await updateDoc(productDoc, updates);
+  };
+
   const updateProductStock = async (productId: string, newStock: number) => {
     if (!currentUser || !businessId) throw new Error("No user logged in to update stock.");
     const productDoc = doc(db, "businesses", businessId, "products", productId);
@@ -470,6 +477,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         updateEmployeeStatus,
         scanBarcode,
         addProduct,
+        updateProduct,
         updateProductStock,
         restockProduct,
         addToCart,

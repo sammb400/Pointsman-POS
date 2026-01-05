@@ -1,20 +1,22 @@
 import { useState, useEffect, useRef } from "react";
-import { usePOS } from "../context/pos-context";
+import { usePOS, type Product } from "../context/pos-context";
 import DashboardLayout from "@/components/dashboard-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Minus, Camera } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Search, Plus, Minus, Camera, Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useZxing } from "react-zxing";
 
 export default function RestockProduct() {
   const { toast } = useToast();
-  const { products, restockProduct, settings } = usePOS();
+  const { products, restockProduct, updateProduct, settings } = usePOS();
   const [searchTerm, setSearchTerm] = useState("");
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   // Filter products based on search term
   const filteredProducts = products.filter((product) =>
@@ -27,6 +29,24 @@ export default function RestockProduct() {
     } catch (error) {
       console.error("Failed to update stock:", error);
       alert("Failed to update stock. Please try again.");
+    }
+  };
+
+  const handleUpdateProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+    
+    try {
+      await updateProduct(editingProduct.id, {
+        name: editingProduct.name,
+        price: editingProduct.price,
+        category: editingProduct.category,
+        barcode: editingProduct.barcode
+      });
+      toast({ title: "Success", description: "Product updated successfully." });
+      setEditingProduct(null);
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update product.", variant: "destructive" });
     }
   };
 
@@ -108,8 +128,16 @@ export default function RestockProduct() {
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 pb-20">
           {filteredProducts.map((product) => (
-            <Card key={product.id} className="hover-elevate">
+            <Card key={product.id} className="hover-elevate relative group">
               <CardContent className="p-4 text-center flex flex-col h-full justify-between gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-2 right-2 h-6 w-6 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity"
+                  onClick={() => setEditingProduct(product)}
+                >
+                  <Pencil className="h-3 w-3" />
+                </Button>
                 <div>
                   <div className="h-12 flex items-center justify-center mb-2">
                     {product.image ? (
@@ -185,6 +213,57 @@ export default function RestockProduct() {
               />
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Product Dialog */}
+      <Dialog open={!!editingProduct} onOpenChange={(open) => !open && setEditingProduct(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Product</DialogTitle>
+          </DialogHeader>
+          {editingProduct && (
+            <form onSubmit={handleUpdateProduct} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Product Name</Label>
+                <Input
+                  id="edit-name"
+                  value={editingProduct.name}
+                  onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-price">Price</Label>
+                <Input
+                  id="edit-price"
+                  type="number"
+                  value={editingProduct.price}
+                  onChange={(e) => setEditingProduct({ ...editingProduct, price: parseFloat(e.target.value) })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-category">Category</Label>
+                <Input
+                  id="edit-category"
+                  value={editingProduct.category}
+                  onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-barcode">Barcode</Label>
+                <Input
+                  id="edit-barcode"
+                  value={editingProduct.barcode || ""}
+                  onChange={(e) => setEditingProduct({ ...editingProduct, barcode: e.target.value })}
+                  placeholder="Scan or enter barcode"
+                />
+              </div>
+              <Button type="submit" className="w-full">Save Changes</Button>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </DashboardLayout>
