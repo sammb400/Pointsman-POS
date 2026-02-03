@@ -237,7 +237,11 @@ export default function AddProduct() {
                 <Label>Product Image (Optional)</Label>
                 <div className="flex flex-col sm:flex-row gap-4">
                   {/* Image Preview */}
-                  <div className="w-32 h-32 border-2 border-dashed rounded-lg flex items-center justify-center bg-muted/50 relative overflow-hidden">
+                  <div 
+                    className="w-32 h-32 border-2 border-dashed rounded-lg flex items-center justify-center bg-muted/50 relative overflow-hidden cursor-pointer hover:bg-muted/70 transition-colors"
+                    onClick={() => cloudinaryWidget.current?.open()}
+                    title="Click to upload image"
+                  >
                     {imagePreview ? (
                       <>
                         <img 
@@ -251,14 +255,20 @@ export default function AddProduct() {
                           variant="destructive"
                           size="sm"
                           className="absolute top-1 right-1 h-6 w-6 p-0"
-                          onClick={removeImage}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeImage();
+                          }}
                           data-testid="button-remove-image"
                         >
                           ×
                         </Button>
                       </>
                     ) : (
-                      <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                      <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                        <ImageIcon className="h-8 w-8" />
+                        <span className="text-xs font-medium">Upload</span>
+                      </div>
                     )}
                   </div>
                   
@@ -450,6 +460,8 @@ function BarcodeScanner({ onScan }: { onScan: (data: string) => void }) {
   const lastTime = useRef(0);
 
   const { ref } = useZxing({
+    constraints: { video: { facingMode: "environment" } },
+    timeBetweenDecodingAttempts: 300,
     onDecodeResult(result: any) {
       const text = result.getText();
       const now = Date.now();
@@ -463,7 +475,7 @@ function BarcodeScanner({ onScan }: { onScan: (data: string) => void }) {
 
   return (
     <div className="relative w-full aspect-square max-w-sm overflow-hidden rounded-lg bg-black">
-      <video ref={ref as any} className="w-full h-full object-cover" />
+      <video ref={ref as any} className="w-full h-full object-cover" muted playsInline />
       <div className="absolute inset-0 border-2 border-primary/50 m-12 rounded-lg pointer-events-none animate-pulse" />
     </div>
   );

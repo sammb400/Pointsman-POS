@@ -152,7 +152,7 @@ export default function RestockProduct() {
                   <h3 className="font-medium text-sm truncate" title={product.name}>{product.name}</h3>
                   <p className="text-muted-foreground text-xs">{product.category}</p>
                   <Badge 
-                    variant={product.stock <= (settings.lowStockThreshold || 10) ? "destructive" : "outline"} 
+                    variant={(product.stock <= 0 || (settings.enableLowStockAlerts && product.stock <= (settings.lowStockThreshold || 10))) ? "destructive" : "outline"} 
                     className="mt-1 text-xs"
                   >
                     {product.stock <= 0 ? "Out of Stock" : `Stock: ${product.stock}`}
@@ -171,7 +171,7 @@ export default function RestockProduct() {
                   </Button>
 
                   <div className="flex flex-col items-center min-w-[2rem]">
-                    <span className={`font-bold ${product.stock <= (settings.lowStockThreshold || 10) ? "text-destructive" : ""}`}>
+                    <span className={`font-bold ${(product.stock <= 0 || (settings.enableLowStockAlerts && product.stock <= (settings.lowStockThreshold || 10))) ? "text-destructive" : ""}`}>
                       {product.stock}
                     </span>
                   </div>
@@ -203,15 +203,18 @@ export default function RestockProduct() {
           <DialogHeader>
             <DialogTitle>Scan Product Barcode</DialogTitle>
           </DialogHeader>
-          <div className="flex items-center justify-center p-4">
+          <div className="flex flex-col items-center justify-center p-4 gap-4">
             {isScannerOpen && (
               <BarcodeScanner 
                 onScan={(barcode) => {
                   handleScan(barcode);
-                  setIsScannerOpen(false);
+                  // Keep scanner open for continuous scanning
                 }} 
               />
             )}
+            <p className="text-sm text-muted-foreground text-center">
+              Point camera at a barcode to add stock.
+            </p>
           </div>
         </DialogContent>
       </Dialog>
@@ -275,6 +278,8 @@ function BarcodeScanner({ onScan }: { onScan: (data: string) => void }) {
   const lastTime = useRef(0);
 
   const { ref } = useZxing({
+    constraints: { video: { facingMode: "environment" } },
+    timeBetweenDecodingAttempts: 300,
     onDecodeResult(result: any) {
       const text = result.getText();
       const now = Date.now();
@@ -284,11 +289,14 @@ function BarcodeScanner({ onScan }: { onScan: (data: string) => void }) {
       lastTime.current = now;
       onScan(text);
     },
+    onError(error) {
+      console.error("Barcode scanner error:", error);
+    }
   });
 
   return (
     <div className="relative w-full aspect-square max-w-sm overflow-hidden rounded-lg bg-black">
-      <video ref={ref as any} className="w-full h-full object-cover" />
+      <video ref={ref as any} className="w-full h-full object-cover" muted playsInline />
       <div className="absolute inset-0 border-2 border-primary/50 m-12 rounded-lg pointer-events-none animate-pulse" />
     </div>
   );

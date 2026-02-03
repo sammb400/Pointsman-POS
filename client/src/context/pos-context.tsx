@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useMemo, type ReactNode
 import { useAuth } from "./auth-context";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, onSnapshot, doc, updateDoc, writeBatch, setDoc, collectionGroup, query, where, getDocs, getDoc, increment, deleteDoc } from "firebase/firestore";
+import emailjs from '@emailjs/browser';
 
 export interface Product {
   id: string; // Firestore uses string IDs
@@ -61,9 +62,14 @@ export interface Settings {
   taxRate: number;
   themeColor: string;
   enableNotifications: boolean;
+  notificationEmail: string;
+  enableSoundEffects: boolean;
   enableLowStockAlerts: boolean;
   lowStockThreshold: number;
   requireManagerApproval: boolean;
+  emailJsServiceId: string;
+  emailJsTemplateId: string;
+  emailJsPublicKey: string;
 }
 
 interface POSContextType {
@@ -108,9 +114,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
     taxRate: 16,
     themeColor: "#FF6347", // Default Tomato
     enableNotifications: true,
+    notificationEmail: "",
+    enableSoundEffects: true,
     enableLowStockAlerts: true,
     lowStockThreshold: 10,
     requireManagerApproval: false,
+    emailJsServiceId: "",
+    emailJsTemplateId: "",
+    emailJsPublicKey: "",
   });
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
@@ -131,6 +142,17 @@ export function POSProvider({ children }: { children: ReactNode }) {
       return [];
     }
   });
+
+  // Helper for sound effects
+  const playSound = (type: "beep" | "success") => {
+    if (!settings.enableSoundEffects) return;
+    
+    // Note: Ensure these files exist in your public/sounds folder
+    const src = type === "beep" ? "/sounds/beep.mp3" : "/sounds/success.mp3";
+    const audio = new Audio(src);
+    audio.volume = 0.5;
+    audio.play().catch(e => console.warn("Sound play failed (check public/sounds folder):", e));
+  };
 
   // Determine the correct business ID (Owner UID)
   useEffect(() => {
@@ -365,6 +387,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const scannedProduct = products.find(p => p.barcode === barcode);
     if (scannedProduct) {
       addToCart(scannedProduct);
+      playSound("beep");
       return true;
     }
     return false;
@@ -424,6 +447,32 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [cart, settings.taxRate]);
 
+  const checkLowStockAndNotify = (soldItems: CartItem[]) => {
+    if (!settings.enableNotifications || !settings.notificationEmail) return;
+
+    const lowStockItems = soldItems.filter(item => {
+      const product = products.find(p => p.id === item.id);
+      if (!product) return false;
+      const remaining = product.stock - item.quantity;
+      return remaining <= settings.lowStockThreshold;
+    });
+
+    if (lowStockItems.length > 0 && settings.emailJsServiceId && settings.emailJsTemplateId && settings.emailJsPublicKey) {
+      const templateParams = {
+        to_email: settings.notificationEmail,
+        store_name: settings.storeName,
+        message: `Low stock alert for:\n${lowStockItems.map(i => {
+           const product = products.find(p => p.id === i.id);
+           const remaining = product ? product.stock - i.quantity : 0;
+           return `${i.name} (${remaining} left)`;
+        }).join("\n")}`
+      };
+      
+      emailjs.send(settings.emailJsServiceId, settings.emailJsTemplateId, templateParams, settings.emailJsPublicKey)
+        .catch(console.error);
+    }
+  };
+
   const finalizeSale = async (cart: CartItem[], paymentType: "Cash" | "M-Pesa", amountTendered?: number): Promise<Sale | null> => {
     if (cart.length === 0) return null;
     if (!currentUser || !businessId) throw new Error("User must be logged in to finalize a sale.");
@@ -467,6 +516,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
       batch.set(doc(salesCollection, sale.id), sale);
 
       await batch.commit();
+      playSound("success");
+      checkLowStockAndNotify(cart);
     } catch (error) {
       console.error("Failed to update stock levels:", error);
       return null; // Return null to indicate the sale failed
@@ -500,9 +551,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
         return acc;
       }, { revenue: 0, transactions: 0 });
 
-      const lowStockItems = products
-        .filter(p => p.stock > 0 && p.stock <= settings.lowStockThreshold)
-        .sort((a, b) => a.stock - b.stock);
+      const lowStockItems = settings.enableLowStockAlerts 
+        ? products.filter(p => p.stock > 0 && p.stock <= settings.lowStockThreshold).sort((a, b) => a.stock - b.stock)
+        : [];
 
       return {
         today: todaySummary,
@@ -510,7 +561,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         lowStockItems,
       };
     }
-  }, [sales, products, settings.lowStockThreshold]);
+  }, [sales, products, settings.lowStockThreshold, settings.enableLowStockAlerts]);
 
   return (
     <POSContext.Provider

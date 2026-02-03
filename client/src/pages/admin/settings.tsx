@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Settings, Store, Bell, Shield, Save, Loader2, Palette } from "lucide-react";
+import { Settings, Store, Bell, Shield, Save, Loader2, Palette, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePOS } from "@/context/pos-context";
+import emailjs from "@emailjs/browser";
 
 const PRESET_COLORS = [
   { name: "Tomato", value: "#FF6347" },
@@ -23,6 +24,7 @@ export default function AdminSettings() {
   const { toast } = useToast();
   const { settings: contextSettings, updateSettings } = usePOS();
   const [isSaving, setIsSaving] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
   
   // Local state for form handling
   const [formData, setFormData] = useState({
@@ -31,6 +33,8 @@ export default function AdminSettings() {
     taxRate: "0",
     themeColor: "#FF6347",
     enableNotifications: true,
+    notificationEmail: "",
+    enableSoundEffects: true,
     enableLowStockAlerts: true,
     lowStockThreshold: "10",
     requireManagerApproval: false,
@@ -45,6 +49,8 @@ export default function AdminSettings() {
         // Use saved tax rate from context if available, otherwise keep default
         taxRate: contextSettings.taxRate !== undefined ? contextSettings.taxRate.toString() : prev.taxRate,
         lowStockThreshold: contextSettings.lowStockThreshold?.toString() ?? prev.lowStockThreshold,
+        notificationEmail: contextSettings.notificationEmail || "",
+        enableSoundEffects: contextSettings.enableSoundEffects ?? true,
       }));
     }
   }, [contextSettings]);
@@ -61,6 +67,15 @@ export default function AdminSettings() {
       toast({
         title: "Validation Error",
         description: "Please enter valid numbers for Tax Rate and Low Stock Threshold.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (formData.enableNotifications && !formData.notificationEmail) {
+      toast({
+        title: "Validation Error",
+        description: "Notification email is required when notifications are enabled.",
         variant: "destructive",
       });
       return;
@@ -85,6 +100,48 @@ export default function AdminSettings() {
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleTestEmail = async () => {
+    // Use environment variables for EmailJS configuration
+    const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+    const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
+    const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+
+    if (!serviceId || !templateId || !publicKey) {
+      toast({
+        title: "Configuration Missing",
+        description: "EmailJS configuration missing in environment variables.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsTesting(true);
+    try {
+      await emailjs.send(
+        serviceId,
+        templateId,
+        {
+          to_email: formData.notificationEmail,
+          store_name: formData.storeName,
+          message: "This is a test notification from your POS system settings.",
+        },
+        publicKey
+      );
+      toast({
+        title: "Test Email Sent",
+        description: "Please check your inbox to confirm receipt.",
+      });
+    } catch (error) {
+      toast({
+        title: "Test Failed",
+        description: "Could not send email. Please check your credentials.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTesting(false);
     }
   };
 
@@ -235,11 +292,52 @@ export default function AdminSettings() {
                 data-testid="switch-notifications"
               />
             </div>
+
+            {formData.enableNotifications && (
+              <div className="space-y-2 pl-4 border-l-2 border-primary/20">
+                <Label htmlFor="notificationEmail">Notification Email</Label>
+                <Input
+                  id="notificationEmail"
+                  type="email"
+                  value={formData.notificationEmail}
+                  onChange={(e) => handleChange("notificationEmail", e.target.value)}
+                  placeholder="alerts@example.com"
+                  data-testid="input-notification-email"
+                />
+                
+                <div className="flex justify-end pt-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleTestEmail}
+                    disabled={isTesting || !formData.notificationEmail}
+                  >
+                    {isTesting ? <Loader2 className="h-3 w-3 mr-2 animate-spin" /> : <Send className="h-3 w-3 mr-2" />}
+                    Test Connection
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">Ensure EmailJS environment variables are configured.</p>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="enableSoundEffects">Sound Effects</Label>
+                <p className="text-sm text-muted-foreground">Play sounds for scan and sale events</p>
+              </div>
+              <Switch
+                id="enableSoundEffects"
+                checked={formData.enableSoundEffects}
+                onCheckedChange={(checked) => handleChange("enableSoundEffects", checked)}
+                data-testid="switch-sound-effects"
+              />
+            </div>
             
             <div className="flex items-center justify-between">
               <div>
                 <Label htmlFor="enableLowStockAlerts">Low Stock Alerts</Label>
-                <p className="text-sm text-muted-foreground">Get notified when products are running low</p>
+                <p className="text-sm text-muted-foreground">Show visual warnings on dashboard and product lists</p>
               </div>
               <Switch
                 id="enableLowStockAlerts"
@@ -270,6 +368,7 @@ export default function AdminSettings() {
         </Card>
 
         {/* Security */}
+        {/* Commented out until Refunds/Discounts are implemented
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -295,6 +394,7 @@ export default function AdminSettings() {
             </div>
           </CardContent>
         </Card>
+        */}
 
         {/* Save Button */}
         <div className="flex justify-end">

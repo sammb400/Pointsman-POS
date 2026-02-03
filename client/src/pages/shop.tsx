@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Minus, Trash2, Smartphone, Banknote, X, CheckCircle2, AlertCircle, Camera } from "lucide-react";
+import { Search, Plus, Minus, Trash2, Smartphone, Banknote, X, CheckCircle2, AlertCircle, Camera, ShoppingCart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePOS } from "@/context/pos-context";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -21,6 +21,7 @@ export default function Shop() {
   const [amountTendered, setAmountTendered] = useState("");
   const [showCheckout, setShowCheckout] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [hideMobileCartButton, setHideMobileCartButton] = useState(false);
   
   // Barcode Scanner Logic
   const barcodeBuffer = useRef("");
@@ -44,6 +45,7 @@ export default function Shop() {
           const success = scanBarcode(barcodeBuffer.current);
           if (success) {
             toast({ title: "Item Scanned", description: `Added product to cart.` });
+            setHideMobileCartButton(false);
           } else {
             toast({ title: "Not Found", description: `No product found with barcode: ${barcodeBuffer.current}`, variant: "destructive" });
           }
@@ -86,7 +88,7 @@ export default function Shop() {
     try {
       // Pass the current cart to finalizeSale so it can update stock
       // For M-Pesa, we pass the exact total automatically
-      const finalAmount = paymentType === "Cash" ? tenderedAmount : Number(total.toFixed(2));
+      const finalAmount = paymentType === "Cash" ? tenderedAmount : total;
 
       const sale = await finalizeSale(cart, paymentType, finalAmount);
       
@@ -107,11 +109,11 @@ export default function Shop() {
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Sale processing error:", error);
       toast({
         title: "Transaction Failed",
-        description: "Could not complete the sale. Please try again.",
+        description: error.message || "Could not complete the sale. Please try again.",
         variant: "destructive",
       });
     }
@@ -138,11 +140,20 @@ export default function Shop() {
     }
 
     addToCart(product);
+    setHideMobileCartButton(false);
+  };
+
+  const scrollToCart = () => {
+    const element = document.getElementById("cart-section");
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth" });
+      setHideMobileCartButton(true);
+    }
   };
 
   return (
     <DashboardLayout>
-      <div className="space-y-4">
+      <div className="space-y-4 pb-24 lg:pb-0">
         <h1 className="text-3xl font-bold">Shop / POS</h1>
 
         <div className="grid lg:grid-cols-3 gap-4">
@@ -206,7 +217,7 @@ export default function Shop() {
                     <h3 className="font-medium text-sm truncate">{product.name}</h3>
                     <p className="text-primary font-bold">Kes {product.price.toFixed(2)}</p>
                     <Badge 
-                      variant={product.stock <= (settings.lowStockThreshold || 10) ? "destructive" : "outline"} 
+                      variant={(product.stock <= 0 || (settings.enableLowStockAlerts && product.stock <= (settings.lowStockThreshold || 10))) ? "destructive" : "outline"} 
                       className="mt-1 text-xs"
                     >
                       {product.stock <= 0 ? "Out of Stock" : `Stock: ${product.stock}`}
@@ -218,7 +229,7 @@ export default function Shop() {
           </div>
 
           {/* Cart & Checkout Section */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1" id="cart-section">
             <Card className="sticky top-4">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
@@ -461,6 +472,28 @@ export default function Shop() {
         </div>
       </div>
 
+      {/* Mobile Sticky Cart Button */}
+      {cart.length > 0 && !hideMobileCartButton && (
+        <div className="fixed bottom-6 left-4 right-4 z-50 lg:hidden">
+          <Button 
+            size="lg" 
+            className="w-full shadow-xl flex justify-between items-center py-6" 
+            onClick={scrollToCart}
+          >
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <ShoppingCart className="h-6 w-6" />
+                <span className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] flex items-center justify-center">
+                  {cart.reduce((sum, item) => sum + item.quantity, 0)}
+                </span>
+              </div>
+              <span className="font-semibold text-lg">View Order</span>
+            </div>
+            <span className="font-bold text-lg">Kes {total.toFixed(2)}</span>
+          </Button>
+        </div>
+      )}
+
       <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -474,6 +507,7 @@ export default function Shop() {
                   if (success) {
                     toast({ title: "Item Scanned", description: "Product added to cart." });
                     setIsScannerOpen(false); // Close on success
+                    setHideMobileCartButton(false);
                   } else {
                     toast({ title: "Not Found", description: `Unknown barcode: ${barcode}`, variant: "destructive" });
                   }
@@ -492,6 +526,8 @@ function BarcodeScanner({ onScan }: { onScan: (data: string) => void }) {
   const lastTime = useRef(0);
 
   const { ref } = useZxing({
+    constraints: { video: { facingMode: "environment" } },
+    timeBetweenDecodingAttempts: 300,
     onDecodeResult(result: any) {
       const text = result.getText();
       const now = Date.now();
@@ -506,7 +542,7 @@ function BarcodeScanner({ onScan }: { onScan: (data: string) => void }) {
 
   return (
     <div className="relative w-full aspect-square max-w-sm overflow-hidden rounded-lg bg-black">
-      <video ref={ref as any} className="w-full h-full object-cover" />
+      <video ref={ref as any} className="w-full h-full object-cover" muted playsInline />
       <div className="absolute inset-0 border-2 border-primary/50 m-12 rounded-lg pointer-events-none animate-pulse" />
     </div>
   );

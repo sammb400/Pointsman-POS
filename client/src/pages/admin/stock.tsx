@@ -23,7 +23,7 @@ export default function AdminStock() {
 
   const getReorderStatus = (stock: number) => {
     if (stock === 0) return "Critical";
-    if (stock <= lowStockThreshold) return "Low";
+    if (settings.enableLowStockAlerts && stock <= lowStockThreshold) return "Low";
     return "OK";
   };
 
