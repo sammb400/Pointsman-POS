@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, ChangeEvent, useMemo } from "react";
 import DashboardLayout from "@/components/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,12 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Package, ArrowLeft, Upload, ImageIcon, Camera } from "lucide-react";
+import { Package, ArrowLeft, Upload, ImageIcon, Camera, FileSpreadsheet } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { usePOS } from "@/context/pos-context";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useZxing } from "react-zxing";
+import AiProductScanner from "@/components/ai-product-scanner";
+import * as Papa from "papaparse";
+import * as XLSX from "xlsx";
 
 interface FormErrors {
   name?: string;
@@ -40,10 +43,21 @@ export default function AddProduct() {
     image: "",
     barcode: "",
   });
+
+  const [isOtherSelected, setIsOtherSelected] = useState(false);
+  const [customCategory, setCustomCategory] = useState("");
+
+  const categoriesList = useMemo(() => {
+    const defaults = ["Beverages", "Pastries", "Food", "Snacks", "Merchandise"];
+    const existing = products.map(p => p.category);
+    return Array.from(new Set([...defaults, ...existing])).sort();
+  }, [products]);
+
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isUploading, setIsUploading] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const cloudinaryWidget = useRef<any>(null);
 
   // Barcode Scanner Logic for USB Scanners
@@ -87,10 +101,14 @@ export default function AddProduct() {
   };
 
   const handleCategoryChange = (value: string) => {
-    setFormData(prev => ({ ...prev, category: value }));
-    if (errors.category) {
-      setErrors(prev => ({ ...prev, category: undefined }));
+    if (value === "other") {
+      setIsOtherSelected(true);
+      setFormData(prev => ({ ...prev, category: "" }));
+    } else {
+      setIsOtherSelected(false);
+      setFormData(prev => ({ ...prev, category: value }));
     }
+    setErrors(prev => ({ ...prev, category: undefined }));
   };
 
   useEffect(() => {
@@ -103,7 +121,7 @@ export default function AddProduct() {
           sources: ["local", "url", "camera"],
           multiple: false,
         },
-        (error: any, result: any) => {
+        (error: unknown, result: { event: string; info: { secure_url: string } }) => {
           if (!error && result && result.event === "success") {
             const secureUrl = result.info.secure_url;
             setFormData(prev => ({ ...prev, image: secureUrl }));
@@ -132,6 +150,8 @@ export default function AddProduct() {
       newErrors.name = "Product name is required";
     }
 
+    const categoryToValidate = isOtherSelected ? customCategory : formData.category;
+
     const price = parseFloat(formData.price);
     if (!formData.price || isNaN(price)) {
       newErrors.price = "Valid price is required";
@@ -146,7 +166,7 @@ export default function AddProduct() {
       newErrors.stock = "Stock cannot be negative";
     }
 
-    if (!formData.category) {
+    if (!categoryToValidate) {
       newErrors.category = "Please select a category";
     }
 
@@ -166,13 +186,15 @@ export default function AddProduct() {
       return;
     }
 
+    const finalCategory = isOtherSelected ? customCategory.trim() : formData.category;
+
     setIsUploading(true);
     try {
       await addProduct({
         name: formData.name.trim(),
         price: parseFloat(formData.price),
         stock: parseInt(formData.stock),
-        category: formData.category.charAt(0).toUpperCase() + formData.category.slice(1),
+        category: finalCategory.charAt(0).toUpperCase() + finalCategory.slice(1).toLowerCase(),
         description: formData.description.trim(),
         image: formData.image,
         barcode: formData.barcode.trim() || undefined,
@@ -198,8 +220,96 @@ export default function AddProduct() {
       image: "",
       barcode: "",
     });
+    setCustomCategory("");
+    setIsOtherSelected(false);
     setImagePreview(null);
     setErrors({});
+    setIsUploading(false);
+  };
+
+  // Helper to find value in object by checking multiple potential key names (case-insensitive)
+  const getFieldValue = (item: any, possibleKeys: string[]) => {
+    const keys = Object.keys(item);
+    for (const pKey of possibleKeys) {
+      const foundKey = keys.find(k => k.toLowerCase().replace(/[^a-z]/g, '') === pKey.toLowerCase().replace(/[^a-z]/g, ''));
+      if (foundKey && (item[foundKey] !== undefined && item[foundKey] !== null)) return item[foundKey];
+    }
+    return "";
+  };
+
+  const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    const extension = file.name.split('.').pop()?.toLowerCase();
+
+    if (extension === 'csv') {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results: Papa.ParseResult<any>) => {
+          processBulkData(results.data as any[]);
+        },
+        error: (error: Error) => {
+          toast({ title: "Parsing Error", description: error.message, variant: "destructive" });
+        }
+      });
+    } else if (extension === 'xlsx' || extension === 'xls') {
+      reader.onload = (evt: ProgressEvent<FileReader>) => {
+        try {
+          const arrayBuffer = evt.target?.result;
+          if (!(arrayBuffer instanceof ArrayBuffer)) return;
+          const data = new Uint8Array(arrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const json = XLSX.utils.sheet_to_json(worksheet);
+          processBulkData(json);
+        } catch (error) {
+          toast({ title: "Parsing Error", description: "Failed to parse Excel file", variant: "destructive" });
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      toast({ title: "Invalid File", description: "Please upload a CSV or Excel file", variant: "destructive" });
+    }
+  };
+
+  const processBulkData = async (data: any[]) => {
+    setIsUploading(true);
+    let count = 0;
+    for (const item of data) {
+      try {
+        const name = getFieldValue(item, ["name", "productname", "title"]);
+        const priceRaw = getFieldValue(item, ["price", "cost", "rate"]);
+        const stockRaw = getFieldValue(item, ["stock", "quantity", "qty", "count"]);
+        const categoryRaw = getFieldValue(item, ["category", "type", "group"]) || "Other";
+
+        if (!name || String(name).trim() === "") continue;
+
+        const price = parseFloat(String(priceRaw)) || 0;
+        const stock = parseInt(String(stockRaw)) || 0;
+        const category = String(categoryRaw).trim();
+
+        await addProduct({
+          name: String(name).trim(),
+          price: price,
+          stock: stock,
+          category: category.charAt(0).toUpperCase() + category.slice(1).toLowerCase(),
+          description: String(getFieldValue(item, ["description", "info"]) || "").trim(),
+          image: String(getFieldValue(item, ["image", "img", "photo", "url"]) || "").trim(),
+          barcode: String(getFieldValue(item, ["barcode", "upc", "sku"]) || "").trim() || undefined,
+        });
+        count++;
+      } catch (err) {
+        console.error("Bulk upload error for item:", item, err);
+      }
+    }
+    toast({ title: "Bulk Upload Complete", description: `Added ${count} products successfully.` });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""; // Reset file input
+    }
     setIsUploading(false);
   };
 
@@ -217,6 +327,29 @@ export default function AddProduct() {
             <p className="text-muted-foreground mt-1">Add a new product to your inventory.</p>
           </div>
         </div>
+
+        <AiProductScanner onDataExtracted={processBulkData} />
+
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5 text-primary" />
+              Bulk Import
+            </CardTitle>
+            <CardDescription>Upload a CSV or Excel file with product details (Name, Price, Stock, Category, etc.)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <Input 
+                ref={fileInputRef}
+                type="file" 
+                accept=".csv, .xlsx, .xls" 
+                onChange={handleFileUpload}
+                disabled={isUploading}
+              />
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
@@ -384,17 +517,28 @@ export default function AddProduct() {
                     className={`h-12 ${errors.category ? "border-destructive" : ""}`} 
                     data-testid="select-category"
                   >
-                    <SelectValue placeholder="Select a category" />
+                    <SelectValue placeholder={isOtherSelected ? "Custom Category..." : "Select a category"} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="beverages">Beverages</SelectItem>
-                    <SelectItem value="pastries">Pastries</SelectItem>
-                    <SelectItem value="food">Food</SelectItem>
-                    <SelectItem value="snacks">Snacks</SelectItem>
-                    <SelectItem value="merchandise">Merchandise</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                    {categoriesList.map(cat => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                    <SelectItem value="other" className="font-medium text-primary">Other...</SelectItem>
                   </SelectContent>
                 </Select>
+                {isOtherSelected && (
+                  <div className="mt-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <Input
+                      placeholder="Enter new category name"
+                      value={customCategory}
+                      onChange={(e) => {
+                        setCustomCategory(e.target.value);
+                        setErrors(prev => ({ ...prev, category: undefined }));
+                      }}
+                      className={`h-10 ${errors.category ? "border-destructive" : ""}`}
+                    />
+                  </div>
+                )}
                 {errors.category && (
                   <p className="text-sm text-destructive">{errors.category}</p>
                 )}
