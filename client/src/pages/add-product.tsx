@@ -245,16 +245,43 @@ export default function AddProduct() {
     const extension = file.name.split('.').pop()?.toLowerCase();
 
     if (extension === 'csv') {
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: (results: Papa.ParseResult<any>) => {
-          processBulkData(results.data as any[]);
-        },
-        error: (error: Error) => {
-          toast({ title: "Parsing Error", description: error.message, variant: "destructive" });
+      const readerCsv = new FileReader();
+      readerCsv.onload = (evt: ProgressEvent<FileReader>) => {
+        try {
+          const text = String(evt.target?.result || "");
+          const lines = text.split(/\r\n|\n/);
+          console.log("CSV raw preview (first 20 lines):", lines.slice(0, 20));
+
+          // Heuristic: find a header row containing typical column names
+          const headerIndex = lines.findIndex((line) => /product\s*name/i.test(line) && /price/i.test(line));
+          if (headerIndex > 0) {
+            console.log(`Detected header at line ${headerIndex + 1}, trimming ${headerIndex} leading lines`);
+          } else if (headerIndex === 0) {
+            console.log("Header is the first line");
+          } else {
+            console.log("No explicit header row detected by heuristic; using entire file as-is (Papa will pick first non-empty row as header)");
+          }
+
+          const cleaned = headerIndex >= 0 ? lines.slice(headerIndex).join("\n") : lines.join("\n");
+
+          Papa.parse(cleaned, {
+            header: true,
+            skipEmptyLines: true,
+            complete: (results: Papa.ParseResult<any>) => {
+              console.log("Papa.parse produced headers:", results.meta && (results.meta as any).fields);
+              processBulkData(results.data as any[]);
+            },
+            error: (error: Error) => {
+              console.error("CSV parsing error:", error);
+              toast({ title: "Parsing Error", description: error.message, variant: "destructive" });
+            }
+          });
+        } catch (err) {
+          console.error("Failed to preprocess CSV:", err);
+          toast({ title: "Parsing Error", description: "Failed to preprocess CSV file", variant: "destructive" });
         }
-      });
+      };
+      readerCsv.readAsText(file);
     } else if (extension === 'xlsx' || extension === 'xls') {
       reader.onload = (evt: ProgressEvent<FileReader>) => {
         try {
@@ -278,21 +305,49 @@ export default function AddProduct() {
 
   const processBulkData = async (data: any[]) => {
     setIsUploading(true);
+    const startTime = Date.now();
+    console.log("🚀 Bulk upload started");
+    console.log("📊 Total items to process:", data.length);
+    console.log("📋 First item sample:", data[0]);
+    console.log("🔑 Available keys in data:", data[0] ? Object.keys(data[0]) : "N/A");
+
     let count = 0;
-    for (const item of data) {
+    let skipped = 0;
+    let errors: Array<{ index: number; item: any; error: string }> = [];
+
+    for (let index = 0; index < data.length; index++) {
+      const item = data[index];
+      console.log(`\n--- Processing item ${index + 1}/${data.length} ---`);
+      
       try {
         const name = getFieldValue(item, ["name", "productname", "title"]);
         const priceRaw = getFieldValue(item, ["price", "cost", "rate"]);
         const stockRaw = getFieldValue(item, ["stock", "quantity", "qty", "count"]);
         const categoryRaw = getFieldValue(item, ["category", "type", "group"]) || "Other";
 
-        if (!name || String(name).trim() === "") continue;
+        console.log("📦 Extracted fields:", {
+          name,
+          priceRaw,
+          stockRaw,
+          categoryRaw,
+          description: getFieldValue(item, ["description", "info"]),
+          image: getFieldValue(item, ["image", "img", "photo", "url"]),
+          barcode: getFieldValue(item, ["barcode", "upc", "sku"])
+        });
+
+        if (!name || String(name).trim() === "") {
+          console.warn(`⏭️  Skipped row ${index + 1}: Empty product name`);
+          skipped++;
+          continue;
+        }
 
         const price = parseFloat(String(priceRaw)) || 0;
         const stock = parseInt(String(stockRaw)) || 0;
         const category = String(categoryRaw).trim();
 
-        await addProduct({
+        console.log("✅ Parsed values:", { name, price, stock, category });
+
+        const productData = {
           name: String(name).trim(),
           price: price,
           stock: stock,
@@ -300,13 +355,38 @@ export default function AddProduct() {
           description: String(getFieldValue(item, ["description", "info"]) || "").trim(),
           image: String(getFieldValue(item, ["image", "img", "photo", "url"]) || "").trim(),
           barcode: String(getFieldValue(item, ["barcode", "upc", "sku"]) || "").trim() || undefined,
-        });
+        };
+
+        console.log("📤 Sending to API:", productData);
+
+        await addProduct(productData);
+        console.log(`✨ Successfully added: ${name}`);
         count++;
       } catch (err) {
-        console.error("Bulk upload error for item:", item, err);
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        console.error(`❌ Error at row ${index + 1}:`, errorMsg);
+        console.error("Item data:", item);
+        errors.push({ index: index + 1, item, error: errorMsg });
       }
     }
-    toast({ title: "Bulk Upload Complete", description: `Added ${count} products successfully.` });
+
+    const duration = Date.now() - startTime;
+    console.log("\n📈 Bulk Upload Summary:");
+    console.log(`✅ Successfully added: ${count}`);
+    console.log(`⏭️  Skipped: ${skipped}`);
+    console.log(`❌ Failed: ${errors.length}`);
+    console.log(`⏱️  Duration: ${duration}ms`);
+
+    if (errors.length > 0) {
+      console.log("🐛 Error details:", errors);
+    }
+
+    toast({ 
+      title: "Bulk Upload Complete", 
+      description: `Added ${count} products. Skipped ${skipped}. Failed ${errors.length}.`,
+      variant: errors.length > 0 ? "destructive" : "default"
+    });
+
     if (fileInputRef.current) {
       fileInputRef.current.value = ""; // Reset file input
     }
